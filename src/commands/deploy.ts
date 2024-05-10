@@ -67,6 +67,7 @@ export const deploy = async (config: DeployConfig) => {
   const { pruneBeforeDeploy = false, siteName, stage = 'production', aws } = config
   const accessKeyId = aws.aws_access_key_id || process.env.AWS_ACCESS_KEY_ID
   const secretAccessKey = aws.aws_secret_access_key || process.env.AWS_SECRET_ACCESS_KEY
+  const region = aws.region || process.env.REGION
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error('AWS Credential are required.')
@@ -79,7 +80,7 @@ export const deploy = async (config: DeployConfig) => {
 
   const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
   const cf = new CloudFormationClient({
-    region: aws.region,
+    region,
     credentials: {
       accessKeyId,
       secretAccessKey
