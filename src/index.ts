@@ -2,6 +2,7 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { deploy } from './commands/deploy'
+import { buildApp } from './commands/build'
 
 interface CLIOptions {
   siteName: string
@@ -57,6 +58,15 @@ cli.command<CLIOptions>(
         awsSecretAccessKey
       }
     })
+  }
+)
+
+cli.command(
+  'build',
+  'build the app',
+  () => {},
+  () => {
+    buildApp()
   }
 )
 
