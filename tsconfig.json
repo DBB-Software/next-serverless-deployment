@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+      "declaration": true,
+      "module": "esnext",
+      "target": "ES2022",
+      "strict": true,
+      "lib": ["DOM", "ESNext"],
+      "outDir": "./dist",
+      "allowSyntheticDefaultImports": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+    },
+    "include": ["src/**/*"]
+}

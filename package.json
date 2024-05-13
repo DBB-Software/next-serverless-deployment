@@ -1,0 +1,42 @@
+{
+  "name": "@dbbs/next-serverless-deployment",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./dist/index.js",
+  "bin": {
+    "@dbb-next": "./dist/index.js"
+  },
+  "exports": {
+    "./*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "lint": "npx eslint \"./src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts*\" --fix"
+  },
+  "author": "Roman Bobrovskiy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DBB-Software/next-serverless-deployment.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DBB-Software/next-serverless-deployment/issues"
+  },
+  "homepage": "https://github.com/DBB-Software/next-serverless-deployment#readme",
+  "devDependencies": {
+    "@types/node": "20.12.11",
+    "eslint": "8.57.0",
+    "prettier": "3.2.5",
+    "typescript": "5.4.5",
+    "eslint-plugin-prettier": "5.1.3",
+    "eslint-config-prettier": "9.1.0",
+    "@typescript-eslint/eslint-plugin": "7.1.0",
+    "@typescript-eslint/parser": "7.1.0"
+  }
+}
