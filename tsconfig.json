@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
       "declaration": true,
-      "module": "esnext",
+      "module": "NodeNext",
       "target": "ES2022",
       "strict": true,
       "lib": ["DOM", "ESNext"],
@@ -9,6 +9,7 @@
       "allowSyntheticDefaultImports": true,
       "esModuleInterop": true,
       "skipLibCheck": true,
+      "moduleResolution": "NodeNext"
     },
-    "include": ["src/**/*"]
+    "include": ["src/**/*.ts"]
 }
