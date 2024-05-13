@@ -16,8 +16,8 @@ export interface DeployConfig {
   pruneBeforeDeploy?: boolean
   aws: {
     region?: string
-    aws_access_key_id?: string
-    aws_secret_access_key?: string
+    awsAccessKeyId?: string
+    awsSecretAccessKey?: string
   }
 }
 
@@ -65,8 +65,8 @@ const destroyStack = async (cf: CloudFormationClient, stackName: string) => {
 
 export const deploy = async (config: DeployConfig) => {
   const { pruneBeforeDeploy = false, siteName, stage = 'production', aws } = config
-  const accessKeyId = aws.aws_access_key_id || process.env.AWS_ACCESS_KEY_ID
-  const secretAccessKey = aws.aws_secret_access_key || process.env.AWS_SECRET_ACCESS_KEY
+  const accessKeyId = aws.awsAccessKeyId || process.env.AWS_ACCESS_KEY_ID
+  const secretAccessKey = aws.awsSecretAccessKey || process.env.AWS_SECRET_ACCESS_KEY
   const region = aws.region || process.env.REGION
 
   if (!accessKeyId || !secretAccessKey) {

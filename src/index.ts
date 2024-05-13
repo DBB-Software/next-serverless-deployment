@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
-
 import { deploy } from './commands/deploy'
 
 interface CLIOptions {
@@ -9,32 +8,32 @@ interface CLIOptions {
   stage?: string
   pruneBeforeDeploy?: boolean
   region?: string
-  aws_access_key_id?: string
-  aws_secret_access_key?: string
+  awsAccessKeyId?: string
+  awsSecretAccessKey?: string
 }
 
 const cli = yargs(hideBin(process.argv))
   .scriptName('@dbbs-next')
   .usage('$0 <command> [options]')
-  .example('$0 deploy --siteName MySite --stage staging --pruneBeforeDeployment', 'Deploys the app.')
+  .example('$0 deploy --siteName MySite --stage staging --pruneBeforeDeployment', 'Deploy the app.')
   .option('siteName', {
     type: 'string',
     requiresArg: true,
-    describe: 'The name used to created CDK stack and components.'
+    describe: 'The name is used to create CDK stack and components.'
   })
   .option('stage', {
     type: 'string',
-    describe: 'The stage of your app, defaults to production'
+    describe: 'The stage of the app, defaults to production'
   })
   .option('pruneBeforeDeploy', {
     type: 'boolean',
     description: 'Clear CDK stack before deployment.',
     default: false
   })
-  .option('aws_access_key_id', {
+  .option('awsAccessKeyId', {
     type: 'string'
   })
-  .option('aws_secret_access_key', {
+  .option('awsSecretAccessKey', {
     type: 'string'
   })
   .option('region', {
@@ -46,7 +45,7 @@ cli.command<CLIOptions>(
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, pruneBeforeDeploy, stage, aws_access_key_id, aws_secret_access_key, region } = argv
+    const { siteName, pruneBeforeDeploy, stage, awsAccessKeyId, awsSecretAccessKey, region } = argv
 
     await deploy({
       siteName,
@@ -54,8 +53,8 @@ cli.command<CLIOptions>(
       pruneBeforeDeploy,
       aws: {
         region,
-        aws_access_key_id,
-        aws_secret_access_key
+        awsAccessKeyId,
+        awsSecretAccessKey
       }
     })
   }
