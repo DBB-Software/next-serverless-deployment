@@ -2,12 +2,19 @@ import { Stack } from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import { BeanstalkDistribution } from '../constructs/BeanstalkDistribution'
 
+interface NextjsProps {
+  stage: string
+}
+
 export class Nextjs extends Stack {
-  constructor(scope: Construct, id: string) {
+  public readonly elasticbeanstalk: BeanstalkDistribution
+
+  constructor(scope: Construct, id: string, props: NextjsProps) {
     super(scope, id)
 
-    const appName = 'NextServer'
+    const { stage } = props
+    const appName = `${id}-${stage}`
 
-    new BeanstalkDistribution(scope, id, { appName })
+    this.elasticbeanstalk = new BeanstalkDistribution(scope, id, { appName, stage })
   }
 }
