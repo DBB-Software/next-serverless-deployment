@@ -15,6 +15,6 @@ export class Nextjs extends Stack {
     const { stage } = props
     const appName = `${id}-${stage}`
 
-    this.elasticbeanstalk = new BeanstalkDistribution(scope, id, { appName, stage })
+    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}ElasticBeanstalk`, { appName, stage })
   }
 }

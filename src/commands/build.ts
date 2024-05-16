@@ -28,11 +28,24 @@ const copyAssets = (outputPath: string, appPath: string, appRelativePath: string
   // Copying static assets (like js, css, images, .etc)
   fs.cpSync(path.join(appPath, '.next', 'static'), path.join(outputPath, '_next', 'static'), { recursive: true })
 
-  fs.cpSync(path.join(appPath, '.next', 'standalone'), path.join(outputPath, 'server'), {
+  fs.cpSync(path.join(appPath, '.next', 'standalone'), outputPath, {
     recursive: true
   })
-  fs.cpSync(path.join(outputPath, 'server', appRelativePath), path.join(outputPath, 'server'), { recursive: true })
-  fs.rmSync(path.join(outputPath, 'server', appRelativePath), { recursive: true })
+  if (appRelativePath && appRelativePath !== '/') {
+    fs.cpSync(path.join(outputPath, appRelativePath), outputPath, { recursive: true })
+    fs.rmSync(path.join(outputPath, appRelativePath), { recursive: true })
+  }
+}
+
+const modifyRunCommand = (outputPath: string) => {
+  const packageFilePath = path.join(outputPath, 'package.json')
+
+  const packageFile = JSON.parse(fs.readFileSync(packageFilePath, { encoding: 'utf-8' }).toString())
+
+  // overrides start command to run simple node server
+  packageFile.scripts.start = 'node ./server.js'
+
+  fs.writeFileSync(packageFilePath, JSON.stringify(packageFile))
 }
 
 export const buildApp = () => {
@@ -50,4 +63,10 @@ export const buildApp = () => {
   buildNextApp(packager)
   const outputPath = createOutputFolder()
   copyAssets(outputPath, currentPath, appRelativePath)
+  modifyRunCommand(outputPath)
+
+  return {
+    outputPath,
+    buildFolderName: OUTPUT_FOLDER
+  }
 }
