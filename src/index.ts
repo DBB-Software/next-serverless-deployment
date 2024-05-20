@@ -3,14 +3,15 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { deploy } from './commands/deploy'
 import { buildApp } from './commands/build'
+import { bootstrap } from './commands/bootstrap'
 
 interface CLIOptions {
   siteName: string
   stage?: string
   pruneBeforeDeploy?: boolean
   region?: string
-  awsAccessKeyId?: string
-  awsSecretAccessKey?: string
+  profile?: string
+  nodejs?: string
 }
 
 const cli = yargs(hideBin(process.argv))
@@ -31,31 +32,41 @@ const cli = yargs(hideBin(process.argv))
     description: 'Clear CDK stack before deployment.',
     default: false
   })
-  .option('awsAccessKeyId', {
-    type: 'string'
-  })
-  .option('awsSecretAccessKey', {
-    type: 'string'
-  })
   .option('region', {
     type: 'string'
   })
+  .option('profile', {
+    type: 'string'
+  })
+  .option('nodejs', {
+    type: 'string'
+  })
+
+cli.command<CLIOptions>(
+  'bootstrap',
+  'bootsrap CDK project',
+  () => {},
+  async (argv) => {
+    const { profile, region } = argv
+    await bootstrap({ profile, region })
+  }
+)
 
 cli.command<CLIOptions>(
   'deploy',
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, pruneBeforeDeploy, stage, awsAccessKeyId, awsSecretAccessKey, region } = argv
+    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs } = argv
 
     await deploy({
       siteName,
       stage,
       pruneBeforeDeploy,
+      nodejs,
       aws: {
         region,
-        awsAccessKeyId,
-        awsSecretAccessKey
+        profile
       }
     })
   }

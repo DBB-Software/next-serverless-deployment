@@ -4,22 +4,34 @@ import {
   CreateStackCommand,
   UpdateStackCommand,
   DeleteStackCommand,
-  TypeNotFoundException
+  CloudFormationServiceException,
+  waitUntilStackCreateComplete,
+  waitUntilStackDeleteComplete,
+  waitUntilStackUpdateComplete,
+  GetTemplateCommand
 } from '@aws-sdk/client-cloudformation'
+import { ElasticBeanstalk } from '@aws-sdk/client-elastic-beanstalk'
+import { S3 } from '@aws-sdk/client-s3'
 import * as cdk from 'aws-cdk-lib'
+import fs from 'node:fs'
+import childProcess from 'node:child_process'
 import { buildApp } from './build'
 import { Nextjs } from '../cdk/stacks/nextJs'
+import { getAWSCredentials } from '../utils/aws'
+import path from 'node:path'
 
 export interface DeployConfig {
   siteName: string
   stage?: string
   pruneBeforeDeploy?: boolean
+  nodejs?: string
   aws: {
     region?: string
-    awsAccessKeyId?: string
-    awsSecretAccessKey?: string
+    profile?: string
   }
 }
+
+const CLOUDFORMATION_STACK_WAIT_TIME = 10 * 60 // 10 minutes
 
 const checkIfStackExists = async (cf: CloudFormationClient, stackName: string) => {
   const command = new DescribeStacksCommand({ StackName: stackName })
@@ -29,8 +41,10 @@ const checkIfStackExists = async (cf: CloudFormationClient, stackName: string) =
 
     return true
   } catch (err) {
-    if (err instanceof TypeNotFoundException) {
-      return false
+    if (err instanceof CloudFormationServiceException) {
+      if (err.name === 'ValidationError') {
+        return false
+      }
     }
 
     throw err
@@ -40,19 +54,30 @@ const checkIfStackExists = async (cf: CloudFormationClient, stackName: string) =
 const createStack = async (cf: CloudFormationClient, stackName: string, template: string) => {
   const command = new CreateStackCommand({
     StackName: stackName,
-    TemplateBody: template
+    TemplateBody: JSON.stringify(template),
+    DisableRollback: true,
+    Capabilities: ['CAPABILITY_IAM']
   })
 
-  return cf.send(command)
+  await cf.send(command)
+  await waitUntilStackCreateComplete(
+    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME },
+    { StackName: stackName }
+  )
 }
 
 const updateStack = async (cf: CloudFormationClient, stackName: string, template: string) => {
   const command = new UpdateStackCommand({
     StackName: stackName,
-    TemplateBody: template
+    TemplateBody: JSON.stringify(template),
+    Capabilities: ['CAPABILITY_IAM']
   })
 
-  return cf.send(command)
+  await cf.send(command)
+  await waitUntilStackUpdateComplete(
+    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME },
+    { StackName: stackName }
+  )
 }
 
 const destroyStack = async (cf: CloudFormationClient, stackName: string) => {
@@ -60,35 +85,68 @@ const destroyStack = async (cf: CloudFormationClient, stackName: string) => {
     StackName: stackName
   })
 
-  return cf.send(command)
+  await cf.send(command)
+  await waitUntilStackDeleteComplete(
+    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME },
+    { StackName: stackName }
+  )
+}
+
+const getCurrentStackTemplate = async (cf: CloudFormationClient, stackName: string) => {
+  const command = new GetTemplateCommand({ StackName: stackName })
+
+  const response = await cf.send(command)
+  return response.TemplateBody || ''
 }
 
 export const deploy = async (config: DeployConfig) => {
   const { pruneBeforeDeploy = false, siteName, stage = 'production', aws } = config
-  const accessKeyId = aws.awsAccessKeyId || process.env.AWS_ACCESS_KEY_ID
-  const secretAccessKey = aws.awsSecretAccessKey || process.env.AWS_SECRET_ACCESS_KEY
+  const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
   const region = aws.region || process.env.REGION
 
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error('AWS Credential are required.')
+  if (!credentials.accessKeyId || !credentials.secretAccessKey) {
+    throw new Error('AWS Credentials are required.')
   }
 
-  buildApp()
-
-  const app = new cdk.App()
-  const nextjsStack = new Nextjs(app, `${siteName}-${stage}`)
-
-  const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
-  const cf = new CloudFormationClient({
+  const clientAWSCredentials = {
     region,
     credentials: {
-      accessKeyId,
-      secretAccessKey
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
     }
+  }
+
+  const { outputPath: buildOutputPath, buildFolderName } = buildApp()
+  const now = Date.now()
+  const archivedFolderName = `${buildFolderName}-v${now}.zip`
+  const buildOutputPathArchived = `${buildOutputPath}-v${now}.zip`
+  const versionLabel = `${buildFolderName}-v${now}`
+
+  fs.writeFileSync(path.join(buildOutputPath, 'Procfile'), 'web: node server.js')
+
+  childProcess.execSync(`cd ${buildOutputPath} && zip -r ../${archivedFolderName} \\.* *`, {
+    stdio: 'inherit'
   })
 
-  const ifStackExists = await checkIfStackExists(cf, nextjsStack.stackName)
+  const cf = new CloudFormationClient(clientAWSCredentials)
+  const ebClient = new ElasticBeanstalk(clientAWSCredentials)
+  const s3Client = new S3(clientAWSCredentials)
 
+  const app = new cdk.App()
+
+  // .toLowerCase() is required, since AWS has limitation for resources names
+  // that name must contain only lowercase characters.
+  if (/[A-Z]/.test(siteName)) {
+    console.warn(
+      'SiteName should not contain uppercase characters. Updating value to contain only lowercase characters.'
+    )
+  }
+  const nextjsStack = new Nextjs(app, siteName.toLowerCase(), { stage, nodejs: config.nodejs })
+
+  const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
+
+  const ifStackExists = await checkIfStackExists(cf, nextjsStack.stackName)
   if (ifStackExists && pruneBeforeDeploy) {
     await destroyStack(cf, nextjsStack.stackName)
   }
@@ -98,6 +156,30 @@ export const deploy = async (config: DeployConfig) => {
   }
 
   if (ifStackExists && !pruneBeforeDeploy) {
-    await updateStack(cf, nextjsStack.stackName, cfTemplate)
+    const currentTemplate = await getCurrentStackTemplate(cf, nextjsStack.stackName)
+    if (currentTemplate !== JSON.stringify(cfTemplate)) {
+      await updateStack(cf, nextjsStack.stackName, cfTemplate)
+    }
   }
+
+  await s3Client.putObject({
+    Bucket: nextjsStack.elasticbeanstalk.s3VersionsBucketName,
+    Key: `${versionLabel}.zip`,
+    Body: fs.readFileSync(buildOutputPathArchived)
+  })
+
+  await ebClient.createApplicationVersion({
+    ApplicationName: nextjsStack.elasticbeanstalk.ebApp.applicationName!,
+    VersionLabel: versionLabel,
+    SourceBundle: {
+      S3Bucket: nextjsStack.elasticbeanstalk.s3VersionsBucketName,
+      S3Key: `${versionLabel}.zip`
+    }
+  })
+
+  await ebClient.updateEnvironment({
+    ApplicationName: nextjsStack.elasticbeanstalk.ebApp.applicationName,
+    EnvironmentName: nextjsStack.elasticbeanstalk.ebEnv.environmentName,
+    VersionLabel: versionLabel
+  })
 }
