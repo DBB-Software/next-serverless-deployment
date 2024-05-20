@@ -134,8 +134,14 @@ export const deploy = async (config: DeployConfig) => {
   const s3Client = new S3(clientAWSCredentials)
 
   const app = new cdk.App()
+
   // .toLowerCase() is required, since AWS has limitation for resources names
   // that name must contain only lowercase characters.
+  if (/[A-Z]/.test(siteName)) {
+    console.warn(
+      'SiteName should not contain uppercase characters. Updating value to contain only lowercase characters.'
+    )
+  }
   const nextjsStack = new Nextjs(app, siteName.toLowerCase(), { stage, nodejs: config.nodejs })
 
   const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
