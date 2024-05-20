@@ -24,6 +24,7 @@ export interface DeployConfig {
   siteName: string
   stage?: string
   pruneBeforeDeploy?: boolean
+  nodejs?: string
   aws: {
     region?: string
     profile?: string
@@ -135,7 +136,7 @@ export const deploy = async (config: DeployConfig) => {
   const app = new cdk.App()
   // .toLowerCase() is required, since AWS has limitation for resources names
   // that name must contain only lowercase characters.
-  const nextjsStack = new Nextjs(app, siteName.toLowerCase(), { stage })
+  const nextjsStack = new Nextjs(app, siteName.toLowerCase(), { stage, nodejs: config.nodejs })
 
   const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
 

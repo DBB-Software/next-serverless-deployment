@@ -4,6 +4,7 @@ import { BeanstalkDistribution } from '../constructs/BeanstalkDistribution'
 
 interface NextjsProps {
   stage: string
+  nodejs?: string
 }
 
 export class Nextjs extends Stack {
@@ -12,9 +13,9 @@ export class Nextjs extends Stack {
   constructor(scope: Construct, id: string, props: NextjsProps) {
     super(scope, id)
 
-    const { stage } = props
+    const { stage, nodejs } = props
     const appName = `${id}-${stage}`
 
-    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}ElasticBeanstalk`, { appName, stage })
+    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}ElasticBeanstalk`, { appName, stage, nodejs })
   }
 }

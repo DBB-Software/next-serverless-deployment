@@ -7,6 +7,12 @@ import { RemovalPolicy } from 'aws-cdk-lib'
 interface BeanstalkDistributionProps {
   appName: string
   stage: string
+  nodejs?: string
+}
+
+const NodeJSEnvironmentMapping: Record<string, string> = {
+  '18': '64bit Amazon Linux 2023 v6.1.5 running Node.js 18',
+  '20': '64bit Amazon Linux 2023 v6.1.5 running Node.js 20'
 }
 
 export class BeanstalkDistribution extends Construct {
@@ -20,7 +26,7 @@ export class BeanstalkDistribution extends Construct {
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
-    const { appName, stage } = props
+    const { appName, stage, nodejs } = props
     this.s3VersionsBucketName = `${appName}-versions`
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, `${appName}-application`, {
@@ -36,10 +42,15 @@ export class BeanstalkDistribution extends Construct {
       roles: [this.ebInstanceProfileRole.roleName]
     })
 
+    // Pass nodejs version to use for EB instance.
+    // Uses nodejs 18 as a fallback.
+    // Available platforms: https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platforms-supported.html#platforms-supported.nodejs
+    const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
+
     this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, `${appName}-environment`, {
       environmentName: `${appName}-environment`,
       applicationName: this.ebApp.applicationName ?? `${appName}-application`,
-      solutionStackName: '64bit Amazon Linux 2023 v6.1.4 running Node.js 20',
+      solutionStackName: nodeJSEnvironment,
       optionSettings: [
         {
           namespace: 'aws:elasticbeanstalk:application:environment',

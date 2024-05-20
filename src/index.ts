@@ -11,6 +11,7 @@ interface CLIOptions {
   pruneBeforeDeploy?: boolean
   region?: string
   profile?: string
+  nodejs?: string
 }
 
 const cli = yargs(hideBin(process.argv))
@@ -37,6 +38,9 @@ const cli = yargs(hideBin(process.argv))
   .option('profile', {
     type: 'string'
   })
+  .option('nodejs', {
+    type: 'string'
+  })
 
 cli.command<CLIOptions>(
   'bootstrap',
@@ -53,12 +57,13 @@ cli.command<CLIOptions>(
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, pruneBeforeDeploy, stage, region, profile } = argv
+    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs } = argv
 
     await deploy({
       siteName,
       stage,
       pruneBeforeDeploy,
+      nodejs,
       aws: {
         region,
         profile
