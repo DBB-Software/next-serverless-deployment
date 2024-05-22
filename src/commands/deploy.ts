@@ -31,7 +31,7 @@ export interface DeployConfig {
   }
 }
 
-const CLOUDFORMATION_STACK_WAIT_TIME = 30 * 60 // 30 minutes
+const CLOUDFORMATION_STACK_WAIT_TIME_SEC = 30 * 60 // 30 minutes
 
 const checkIfStackExists = async (cf: CloudFormationClient, stackName: string) => {
   const command = new DescribeStacksCommand({ StackName: stackName })
@@ -61,7 +61,7 @@ const createStack = async (cf: CloudFormationClient, stackName: string, template
 
   await cf.send(command)
   await waitUntilStackCreateComplete(
-    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME },
+    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME_SEC },
     { StackName: stackName }
   )
 }
@@ -75,7 +75,7 @@ const updateStack = async (cf: CloudFormationClient, stackName: string, template
 
   await cf.send(command)
   await waitUntilStackUpdateComplete(
-    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME },
+    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME_SEC },
     { StackName: stackName }
   )
 }
@@ -87,7 +87,7 @@ const destroyStack = async (cf: CloudFormationClient, stackName: string) => {
 
   await cf.send(command)
   await waitUntilStackDeleteComplete(
-    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME },
+    { client: cf, maxWaitTime: CLOUDFORMATION_STACK_WAIT_TIME_SEC },
     { StackName: stackName }
   )
 }

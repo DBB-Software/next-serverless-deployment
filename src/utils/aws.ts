@@ -36,7 +36,7 @@ export const getSTSIdentity = async (props: GetAWSBasicProps) => {
 }
 
 export const uploadFileToS3 = async (s3Client: S3, options: PutObjectCommandInput) => {
-  await s3Client.putObject(options)
+  return s3Client.putObject(options)
 }
 
 export const uploadFolderToS3 = async (s3Client: S3, options: S3UploadFolderOptions) => {
