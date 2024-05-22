@@ -17,7 +17,7 @@ import fs from 'node:fs'
 import childProcess from 'node:child_process'
 import { buildApp } from './build'
 import { Nextjs } from '../cdk/stacks/nextJs'
-import { getAWSCredentials } from '../utils/aws'
+import { getAWSCredentials, uploadFolderToS3, uploadFileToS3 } from '../utils/aws'
 import path from 'node:path'
 
 export interface DeployConfig {
@@ -31,7 +31,7 @@ export interface DeployConfig {
   }
 }
 
-const CLOUDFORMATION_STACK_WAIT_TIME = 10 * 60 // 10 minutes
+const CLOUDFORMATION_STACK_WAIT_TIME = 30 * 60 // 30 minutes
 
 const checkIfStackExists = async (cf: CloudFormationClient, stackName: string) => {
   const command = new DescribeStacksCommand({ StackName: stackName })
@@ -162,7 +162,15 @@ export const deploy = async (config: DeployConfig) => {
     }
   }
 
-  await s3Client.putObject({
+  // upload static assets.
+  await uploadFolderToS3(s3Client, {
+    Bucket: nextjsStack.staticBucketName,
+    Key: '_next',
+    folderRootPath: buildOutputPath
+  })
+
+  // upload code version to bucket.
+  await uploadFileToS3(s3Client, {
     Bucket: nextjsStack.elasticbeanstalk.s3VersionsBucketName,
     Key: `${versionLabel}.zip`,
     Body: fs.readFileSync(buildOutputPathArchived)
