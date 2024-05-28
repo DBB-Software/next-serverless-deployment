@@ -12,6 +12,7 @@ interface CLIOptions {
   region?: string
   profile?: string
   nodejs?: string
+  production?: boolean
 }
 
 const cli = yargs(hideBin(process.argv))
@@ -41,6 +42,11 @@ const cli = yargs(hideBin(process.argv))
   .option('nodejs', {
     type: 'string'
   })
+  .option('production', {
+    type: 'boolean',
+    description: 'Creates production stack.',
+    default: false
+  })
 
 cli.command<CLIOptions>(
   'bootstrap',
@@ -57,13 +63,14 @@ cli.command<CLIOptions>(
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs } = argv
+    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs, production } = argv
 
     await deploy({
       siteName,
       stage,
       pruneBeforeDeploy,
       nodejs,
+      isProduction: production,
       aws: {
         region,
         profile

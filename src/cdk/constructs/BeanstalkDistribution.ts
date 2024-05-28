@@ -8,6 +8,7 @@ interface BeanstalkDistributionProps {
   appName: string
   stage: string
   nodejs?: string
+  isProduction?: boolean
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
@@ -26,7 +27,7 @@ export class BeanstalkDistribution extends Construct {
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
-    const { appName, stage, nodejs } = props
+    const { appName, stage, nodejs, isProduction } = props
     this.s3VersionsBucketName = `${appName}-versions`
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, `${appName}-application`, {
@@ -76,7 +77,7 @@ export class BeanstalkDistribution extends Construct {
     })
 
     this.ebS3 = new s3.Bucket(this, this.s3VersionsBucketName, {
-      removalPolicy: stage === 'production' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
       bucketName: this.s3VersionsBucketName
     })
   }
