@@ -25,6 +25,7 @@ export interface DeployConfig {
   stage?: string
   pruneBeforeDeploy?: boolean
   nodejs?: string
+  isProduction?: boolean
   aws: {
     region?: string
     profile?: string
@@ -100,7 +101,7 @@ const getCurrentStackTemplate = async (cf: CloudFormationClient, stackName: stri
 }
 
 export const deploy = async (config: DeployConfig) => {
-  const { pruneBeforeDeploy = false, siteName, stage = 'production', aws } = config
+  const { pruneBeforeDeploy = false, siteName, stage = 'development', aws } = config
   const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
   const region = aws.region || process.env.REGION
 
@@ -142,7 +143,11 @@ export const deploy = async (config: DeployConfig) => {
       'SiteName should not contain uppercase characters. Updating value to contain only lowercase characters.'
     )
   }
-  const nextjsStack = new Nextjs(app, siteName.toLowerCase(), { stage, nodejs: config.nodejs })
+  const nextjsStack = new Nextjs(app, siteName.toLowerCase(), {
+    stage,
+    nodejs: config.nodejs,
+    isProduction: config.isProduction
+  })
 
   const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
 

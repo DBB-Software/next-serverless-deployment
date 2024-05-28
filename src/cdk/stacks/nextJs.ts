@@ -7,6 +7,7 @@ import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 interface NextjsProps {
   stage: string
   nodejs?: string
+  isProduction?: boolean
 }
 
 export class Nextjs extends Stack {
@@ -18,16 +19,21 @@ export class Nextjs extends Stack {
   constructor(scope: Construct, id: string, props: NextjsProps) {
     super(scope, id)
 
-    const { stage, nodejs } = props
+    const { stage, nodejs, isProduction } = props
     const appName = `${id}-${stage}`
     this.staticBucketName = `${appName}-static`
 
     this.staticBucket = new s3.Bucket(this, this.staticBucketName, {
-      removalPolicy: stage === 'production' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
       bucketName: this.staticBucketName,
       publicReadAccess: true
     })
-    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}ElasticBeanstalk`, { appName, stage, nodejs })
+    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}ElasticBeanstalk`, {
+      appName,
+      stage,
+      nodejs,
+      isProduction
+    })
     this.cloudfront = new CloudFrontDistribution(this, `${id}CloudFront`, {
       staticBucket: this.staticBucket,
       ebEnv: this.elasticbeanstalk.ebEnv
