@@ -3,6 +3,7 @@ import * as elasticbeanstalk from 'aws-cdk-lib/aws-elasticbeanstalk'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import { RemovalPolicy } from 'aws-cdk-lib'
+import { addOutput } from '../../utils/cdk'
 
 interface BeanstalkDistributionProps {
   appName: string
@@ -22,13 +23,11 @@ export class BeanstalkDistribution extends Construct {
   public readonly ebS3: s3.Bucket
   public readonly ebInstanceProfile: iam.CfnInstanceProfile
   public readonly ebInstanceProfileRole: iam.Role
-  public readonly s3VersionsBucketName: string
 
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
     const { appName, stage, nodejs, isProduction } = props
-    this.s3VersionsBucketName = `${appName}-versions`
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, `${appName}-app`, {
       applicationName: appName
@@ -76,9 +75,13 @@ export class BeanstalkDistribution extends Construct {
       ]
     })
 
-    this.ebS3 = new s3.Bucket(this, this.s3VersionsBucketName, {
-      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
-      bucketName: this.s3VersionsBucketName
+    this.ebS3 = new s3.Bucket(this, `${appName}-versions`, {
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
     })
+
+    addOutput(this, 'BeanstalkDomain', this.ebEnv.attrEndpointUrl)
+    addOutput(this, 'BeanstalkApplicationName', this.ebApp.applicationName!)
+    addOutput(this, 'BeanstalkEnvironmentName', this.ebEnv.environmentName!)
+    addOutput(this, 'BeanstalkVersionsBucketName', this.ebS3.bucketName)
   }
 }

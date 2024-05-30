@@ -7,7 +7,7 @@ import { buildLambda } from '../../build/edge'
 
 interface RoutingLambdaEdgeProps extends StackProps {
   bucketName: string
-  ebAppUrl: string
+  ebAppDomain: string
   buildOutputPath: string
   nodejs?: string
 }
@@ -21,7 +21,7 @@ export class RoutingLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: RoutingLambdaEdgeProps) {
-    const { bucketName, ebAppUrl, nodejs, buildOutputPath } = props
+    const { bucketName, ebAppDomain, nodejs, buildOutputPath } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
@@ -29,7 +29,7 @@ export class RoutingLambdaEdge extends Construct {
     buildLambda('edgeRouting', buildOutputPath, {
       define: {
         'process.env.S3_BUCKET': JSON.stringify(bucketName),
-        'process.env.EB_APP_URL': JSON.stringify(ebAppUrl)
+        'process.env.EB_APP_URL': JSON.stringify(`http://${ebAppDomain}`)
       }
     })
 
