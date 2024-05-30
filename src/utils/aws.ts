@@ -1,8 +1,11 @@
 import { fromNodeProviderChain, fromEnv, fromIni } from '@aws-sdk/credential-providers'
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts'
 import { S3, PutObjectCommandInput } from '@aws-sdk/client-s3'
+import { AssetManifest, AssetPublishing, type IAws } from 'cdk-assets'
+import * as AWS from 'aws-sdk'
+import { partition } from '@aws-sdk/util-endpoints'
 import fs from 'node:fs'
-import path from 'path'
+import path from 'node:path'
 
 type GetAWSBasicProps =
   | {
@@ -61,4 +64,69 @@ export const uploadFolderToS3 = async (s3Client: S3, options: S3UploadFolderOpti
       })
     }
   }
+}
+
+export class AWSClient implements IAws {
+  private readonly region?: string
+  private readonly profile?: string
+
+  constructor(region?: string, profile?: string) {
+    this.region = region
+    this.profile = profile
+  }
+
+  public async discoverDefaultRegion(): Promise<string> {
+    return this.region ?? ''
+  }
+
+  public async discoverPartition() {
+    return partition(this.region ?? '').name
+  }
+
+  public async discoverCurrentAccount() {
+    const { Account } = await getSTSIdentity({
+      region: this.region,
+      profile: this.profile
+    })
+
+    return {
+      accountId: Account!,
+      partition: await this.discoverPartition()!
+    }
+  }
+
+  public async discoverTargetAccount() {
+    return this.discoverCurrentAccount()
+  }
+
+  public async s3Client() {
+    const creds = await getAWSCredentials({
+      region: this.region,
+      profile: this.profile
+    })
+    return new AWS.S3({ region: this.region, credentials: creds })
+  }
+
+  public async ecrClient() {
+    const creds = await getAWSCredentials({
+      region: this.region,
+      profile: this.profile
+    })
+    return new AWS.ECR({ region: this.region, credentials: creds })
+  }
+
+  public async secretsManagerClient() {
+    const creds = await getAWSCredentials({
+      region: this.region,
+      profile: this.profile
+    })
+    return new AWS.SecretsManager({ region: this.region, credentials: creds })
+  }
+}
+
+export const getCDKAssetsPublisher = (
+  manifestPath: string,
+  { region, profile }: { region?: string; profile?: string }
+) => {
+  return new AssetPublishing(AssetManifest.fromFile(manifestPath), { aws: new AWSClient(region, profile) })
 }

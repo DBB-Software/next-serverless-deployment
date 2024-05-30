@@ -16,8 +16,9 @@ import * as cdk from 'aws-cdk-lib'
 import fs from 'node:fs'
 import childProcess from 'node:child_process'
 import { buildApp } from './build'
-import { Nextjs } from '../cdk/stacks/nextJs'
-import { getAWSCredentials, uploadFolderToS3, uploadFileToS3 } from '../utils/aws'
+import { NextRenderServerStack } from '../cdk/stacks/NextRenderServerStack'
+import { NextCloudfrontStack } from '../cdk/stacks/NextCloudfrontStack'
+import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, getCDKAssetsPublisher } from '../utils/aws'
 import path from 'node:path'
 
 export interface DeployConfig {
@@ -29,6 +30,18 @@ export interface DeployConfig {
   aws: {
     region?: string
     profile?: string
+  }
+}
+
+export interface DeployStackProps {
+  region?: string
+  profile?: string
+  pruneBeforeDeploy?: boolean
+  buildOutputPath: string
+  credentials: {
+    accessKeyId: string
+    secretAccessKey: string
+    sessionToken?: string
   }
 }
 
@@ -93,6 +106,50 @@ const destroyStack = async (cf: CloudFormationClient, stackName: string) => {
   )
 }
 
+const deployStack = async (
+  stack: cdk.Stack,
+  stackTemplate: string,
+  config: DeployStackProps
+): Promise<Record<string, string>> => {
+  const { pruneBeforeDeploy, buildOutputPath, region, profile, ...restConfig } = config
+  const cf = new CloudFormationClient({
+    ...restConfig,
+    region,
+    logger: console
+  })
+
+  const assetsPublisher = getCDKAssetsPublisher(path.join(buildOutputPath, `${stack.stackName}.assets.json`), {
+    region: region,
+    profile: profile
+  })
+  await assetsPublisher.publish()
+
+  const ifStackExists = await checkIfStackExists(cf, stack.stackName)
+  if (ifStackExists && pruneBeforeDeploy) {
+    await destroyStack(cf, stack.stackName)
+  }
+
+  if (!ifStackExists || (ifStackExists && pruneBeforeDeploy)) {
+    await createStack(cf, stack.stackName, stackTemplate)
+  }
+
+  if (ifStackExists && !pruneBeforeDeploy) {
+    const currentTemplate = await getCurrentStackTemplate(cf, stack.stackName)
+    if (currentTemplate !== JSON.stringify(stackTemplate)) {
+      await updateStack(cf, stack.stackName, stackTemplate)
+    }
+  }
+
+  const result = await cf.send(new DescribeStacksCommand({ StackName: stack.stackName }))
+
+  return result.Stacks![0].Outputs!.reduce((prev: Record<string, string>, curr) => {
+    return {
+      ...prev,
+      [curr.ExportName as string]: curr.OutputValue!
+    }
+  }, {})
+}
+
 const getCurrentStackTemplate = async (cf: CloudFormationClient, stackName: string) => {
   const command = new GetTemplateCommand({ StackName: stackName })
 
@@ -109,6 +166,19 @@ export const deploy = async (config: DeployConfig) => {
     throw new Error('AWS Credentials are required.')
   }
 
+  // Build and zip app.
+  const { outputPath: buildOutputPath, buildFolderName } = await buildApp()
+  const now = Date.now()
+  const archivedFolderName = `${buildFolderName}-server-v${now}.zip`
+  const buildOutputPathArchived = path.join(buildOutputPath, archivedFolderName)
+  const versionLabel = `${buildFolderName}-server-v${now}`
+
+  fs.writeFileSync(path.join(buildOutputPath, 'server', 'Procfile'), 'web: node server.js')
+
+  childProcess.execSync(`cd ${path.join(buildOutputPath, 'server')} && zip -r ../${archivedFolderName} \\.* *`, {
+    stdio: 'inherit'
+  })
+
   const clientAWSCredentials = {
     region,
     credentials: {
@@ -118,23 +188,12 @@ export const deploy = async (config: DeployConfig) => {
     }
   }
 
-  const { outputPath: buildOutputPath, buildFolderName } = buildApp()
-  const now = Date.now()
-  const archivedFolderName = `${buildFolderName}-v${now}.zip`
-  const buildOutputPathArchived = `${buildOutputPath}-v${now}.zip`
-  const versionLabel = `${buildFolderName}-v${now}`
-
-  fs.writeFileSync(path.join(buildOutputPath, 'Procfile'), 'web: node server.js')
-
-  childProcess.execSync(`cd ${buildOutputPath} && zip -r ../${archivedFolderName} \\.* *`, {
-    stdio: 'inherit'
-  })
-
-  const cf = new CloudFormationClient(clientAWSCredentials)
   const ebClient = new ElasticBeanstalk(clientAWSCredentials)
   const s3Client = new S3(clientAWSCredentials)
 
-  const app = new cdk.App()
+  const app = new cdk.App({
+    outdir: buildOutputPath
+  })
 
   // .toLowerCase() is required, since AWS has limitation for resources names
   // that name must contain only lowercase characters.
@@ -143,56 +202,72 @@ export const deploy = async (config: DeployConfig) => {
       'SiteName should not contain uppercase characters. Updating value to contain only lowercase characters.'
     )
   }
-  const nextjsStack = new Nextjs(app, siteName.toLowerCase(), {
+  const siteNameLowerCased = siteName.toLowerCase()
+  const nextRenderServerStack = new NextRenderServerStack(app, `${siteNameLowerCased}-server`, {
     stage,
     nodejs: config.nodejs,
-    isProduction: config.isProduction
+    isProduction: config.isProduction,
+    crossRegionReferences: true,
+    env: {
+      region
+    }
+  })
+  const nextCloudfrontStack = new NextCloudfrontStack(app, `${siteNameLowerCased}-cf`, {
+    nodejs: config.nodejs,
+    staticBucketName: nextRenderServerStack.staticBucketName,
+    staticBucket: nextRenderServerStack.staticBucket,
+    ebEnv: nextRenderServerStack.elasticbeanstalk.ebEnv,
+    ebAppUrl: '', // nextRenderServerStackInfo.BeanstalkURL
+    buildOutputPath,
+    crossRegionReferences: true,
+    env: {
+      region: 'us-east-1' // required for edge
+    }
+  })
+  const assembly = app.synth()
+  const nextRenderServerStackTemplate = assembly.getStackByName(nextRenderServerStack.stackName).template
+  await deployStack(nextRenderServerStack, nextRenderServerStackTemplate, {
+    ...clientAWSCredentials,
+    pruneBeforeDeploy,
+    buildOutputPath,
+    profile: config.aws.profile
   })
 
-  const cfTemplate = app.synth().getStackByName(nextjsStack.stackName).template
-
-  const ifStackExists = await checkIfStackExists(cf, nextjsStack.stackName)
-  if (ifStackExists && pruneBeforeDeploy) {
-    await destroyStack(cf, nextjsStack.stackName)
-  }
-
-  if (!ifStackExists || (ifStackExists && pruneBeforeDeploy)) {
-    await createStack(cf, nextjsStack.stackName, cfTemplate)
-  }
-
-  if (ifStackExists && !pruneBeforeDeploy) {
-    const currentTemplate = await getCurrentStackTemplate(cf, nextjsStack.stackName)
-    if (currentTemplate !== JSON.stringify(cfTemplate)) {
-      await updateStack(cf, nextjsStack.stackName, cfTemplate)
-    }
-  }
+  const nextCloudfrontStackTemplate = assembly.getStackByName(nextCloudfrontStack.stackName).template
+  await deployStack(nextCloudfrontStack, nextCloudfrontStackTemplate, {
+    ...clientAWSCredentials,
+    pruneBeforeDeploy,
+    buildOutputPath,
+    profile: config.aws.profile,
+    region: 'us-east-1'
+  })
 
   // upload static assets.
   await uploadFolderToS3(s3Client, {
-    Bucket: nextjsStack.staticBucketName,
+    Bucket: nextRenderServerStack.staticBucketName,
     Key: '_next',
     folderRootPath: buildOutputPath
   })
 
   // upload code version to bucket.
   await uploadFileToS3(s3Client, {
-    Bucket: nextjsStack.elasticbeanstalk.s3VersionsBucketName,
+    Bucket: nextRenderServerStack.elasticbeanstalk.s3VersionsBucketName,
     Key: `${versionLabel}.zip`,
     Body: fs.readFileSync(buildOutputPathArchived)
   })
 
   await ebClient.createApplicationVersion({
-    ApplicationName: nextjsStack.elasticbeanstalk.ebApp.applicationName!,
+    ApplicationName: nextRenderServerStack.elasticbeanstalk.ebApp.applicationName!,
     VersionLabel: versionLabel,
     SourceBundle: {
-      S3Bucket: nextjsStack.elasticbeanstalk.s3VersionsBucketName,
+      S3Bucket: nextRenderServerStack.elasticbeanstalk.s3VersionsBucketName,
       S3Key: `${versionLabel}.zip`
     }
   })
 
   await ebClient.updateEnvironment({
-    ApplicationName: nextjsStack.elasticbeanstalk.ebApp.applicationName,
-    EnvironmentName: nextjsStack.elasticbeanstalk.ebEnv.environmentName,
+    ApplicationName: nextRenderServerStack.elasticbeanstalk.ebApp.applicationName,
+    EnvironmentName: nextRenderServerStack.elasticbeanstalk.ebEnv.environmentName,
     VersionLabel: versionLabel
   })
 }

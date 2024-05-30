@@ -30,7 +30,7 @@ export class BeanstalkDistribution extends Construct {
     const { appName, stage, nodejs, isProduction } = props
     this.s3VersionsBucketName = `${appName}-versions`
 
-    this.ebApp = new elasticbeanstalk.CfnApplication(this, `${appName}-application`, {
+    this.ebApp = new elasticbeanstalk.CfnApplication(this, `${appName}-app`, {
       applicationName: appName
     })
 
@@ -48,9 +48,9 @@ export class BeanstalkDistribution extends Construct {
     // Available platforms: https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platforms-supported.html#platforms-supported.nodejs
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
 
-    this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, `${appName}-environment`, {
-      environmentName: `${appName}-environment`,
-      applicationName: this.ebApp.applicationName ?? `${appName}-application`,
+    this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, `${appName}-env`, {
+      environmentName: `${appName}-env`,
+      applicationName: this.ebApp.applicationName ?? `${appName}-app`,
       solutionStackName: nodeJSEnvironment,
       optionSettings: [
         {

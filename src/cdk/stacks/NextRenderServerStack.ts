@@ -1,23 +1,21 @@
-import { RemovalPolicy, Stack } from 'aws-cdk-lib'
+import { RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import { BeanstalkDistribution } from '../constructs/BeanstalkDistribution'
-import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 
-interface NextjsProps {
+interface NextRenderServerStackProps extends StackProps {
   stage: string
   nodejs?: string
   isProduction?: boolean
 }
 
-export class Nextjs extends Stack {
+export class NextRenderServerStack extends Stack {
   public readonly elasticbeanstalk: BeanstalkDistribution
-  public readonly cloudfront: CloudFrontDistribution
   public readonly staticBucket: s3.Bucket
   public readonly staticBucketName: string
 
-  constructor(scope: Construct, id: string, props: NextjsProps) {
-    super(scope, id)
+  constructor(scope: Construct, id: string, props: NextRenderServerStackProps) {
+    super(scope, id, props)
 
     const { stage, nodejs, isProduction } = props
     const appName = `${id}-${stage}`
@@ -25,18 +23,13 @@ export class Nextjs extends Stack {
 
     this.staticBucket = new s3.Bucket(this, this.staticBucketName, {
       removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
-      bucketName: this.staticBucketName,
-      publicReadAccess: true
+      bucketName: this.staticBucketName
     })
-    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}ElasticBeanstalk`, {
+    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}-eb`, {
       appName,
       stage,
       nodejs,
       isProduction
-    })
-    this.cloudfront = new CloudFrontDistribution(this, `${id}CloudFront`, {
-      staticBucket: this.staticBucket,
-      ebEnv: this.elasticbeanstalk.ebEnv
     })
   }
 }
