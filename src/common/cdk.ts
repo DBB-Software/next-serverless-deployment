@@ -14,7 +14,7 @@ import {
 } from '@aws-sdk/client-cloudformation'
 import path from 'node:path'
 
-import { getCDKAssetsPublisher } from '../utils/aws'
+import { getCDKAssetsPublisher } from './aws'
 
 export const addOutput = (scope: Construct, exportName: string, value: string) => {
   return new cdk.CfnOutput(scope, exportName, {
@@ -32,6 +32,7 @@ interface AppStackOptions extends cdk.StackProps {
   buildOutputPath: string
   region?: string
   profile?: string
+  stage?: string
   credentials: {
     accessKeyId: string
     secretAccessKey: string
@@ -48,17 +49,17 @@ export class AppStack<T extends cdk.Stack, U> {
   public readonly stackTemplate: string
 
   constructor(stackName: string, Stack: AppStackConstructorWithArgs<T, U>, options: U & AppStackOptions) {
-    this.stackName = stackName
+    this.stackName = `${options.stage ? `${options.stage}-` : ''}${stackName}`
     this.stackApp = new cdk.App({
       outdir: options.buildOutputPath
     })
     this.cfClient = new CloudFormationClient({
-      region: options.region,
+      region: options.env?.region || options.region,
       credentials: options.credentials
     })
-    this.stack = new Stack(this.stackApp, stackName, options)
+    this.stack = new Stack(this.stackApp, this.stackName, options)
     this.options = options
-    this.stackTemplate = this.stackApp.synth().getStackByName(stackName).template
+    this.stackTemplate = this.stackApp.synth().getStackByName(this.stackName).template
   }
 
   public static CLOUDFORMATION_STACK_WAIT_TIME_SEC = 30 * 60 // 30 minutes
@@ -95,7 +96,6 @@ export class AppStack<T extends cdk.Stack, U> {
     const command = new CreateStackCommand({
       StackName: this.stackName,
       TemplateBody: JSON.stringify(this.stackTemplate),
-      DisableRollback: true,
       Capabilities: ['CAPABILITY_IAM']
     })
 

@@ -47,6 +47,7 @@ export const handler = async (
             statusDescription: res.statusMessage || 'Internal Server Error',
             body: data
           }
+
           callback(null, response)
         })
       })
@@ -57,6 +58,7 @@ export const handler = async (
           statusDescription: 'Internal Server Error',
           body: `Error: ${e.message}`
         }
+
         callback(null, response)
       })
 

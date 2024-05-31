@@ -2,12 +2,12 @@ import { ElasticBeanstalk } from '@aws-sdk/client-elastic-beanstalk'
 import { S3 } from '@aws-sdk/client-s3'
 import fs from 'node:fs'
 import childProcess from 'node:child_process'
-import { buildApp } from './build'
+import path from 'node:path'
+import { buildApp } from '../commands/build'
 import { NextRenderServerStack, type NextRenderServerStackProps } from '../cdk/stacks/NextRenderServerStack'
 import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stacks/NextCloudfrontStack'
-import { getAWSCredentials, uploadFolderToS3, uploadFileToS3 } from '../utils/aws'
-import { AppStack } from '../utils/cdk'
-import path from 'node:path'
+import { getAWSCredentials, uploadFolderToS3, uploadFileToS3 } from '../common/aws'
+import { AppStack } from '../common/cdk'
 
 export interface DeployConfig {
   siteName: string
@@ -80,14 +80,16 @@ export const deploy = async (config: DeployConfig) => {
     `${siteNameLowerCased}-server`,
     NextRenderServerStack,
     {
+      ...clientAWSCredentials,
       pruneBeforeDeploy,
       buildOutputPath,
       profile: config.aws.profile,
-      credentials,
       stage,
+      version: now.toString(),
       nodejs: config.nodejs,
       isProduction: config.isProduction,
       crossRegionReferences: true,
+      region,
       env: {
         region
       }
@@ -112,7 +114,7 @@ export const deploy = async (config: DeployConfig) => {
       ApplicationName: output.BeanstalkApplicationName,
       VersionLabel: versionLabel,
       SourceBundle: {
-        S3Bucket: output.StaticBucketName,
+        S3Bucket: output.BeanstalkVersionsBucketName,
         S3Key: `${versionLabel}.zip`
       }
     })
@@ -130,9 +132,9 @@ export const deploy = async (config: DeployConfig) => {
     `${siteNameLowerCased}-cf`,
     NextCloudfrontStack,
     {
+      ...clientAWSCredentials,
       pruneBeforeDeploy,
       profile: config.aws.profile,
-      credentials,
       nodejs: config.nodejs,
       staticBucketName: nextRenderServerStackOutput.StaticBucketName,
       ebAppDomain: nextRenderServerStackOutput.BeanstalkDomain,

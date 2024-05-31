@@ -1,5 +1,5 @@
 import childProcess from 'node:child_process'
-import { ProjectPackager } from '../utils'
+import { ProjectPackager } from '../common/project'
 
 const setNextOptions = () => {
   // Same as `target: "standalone"` in next.config.js

@@ -20,7 +20,7 @@ export class NextCloudfrontStack extends Stack {
     super(scope, id, props)
     const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region } = props
 
-    this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}RoutingLambdaEdge`, {
+    this.routingLambdaEdge = new RoutingLambdaEdge(this, 'RoutingLambdaEdge', {
       nodejs,
       bucketName: staticBucketName,
       ebAppDomain,
@@ -32,7 +32,7 @@ export class NextCloudfrontStack extends Stack {
       region
     })
 
-    this.cloudfront = new CloudFrontDistribution(this, `${id}CloudFront`, {
+    this.cloudfront = new CloudFrontDistribution(this, 'NextCloudFront', {
       staticBucket,
       ebAppDomain,
       edgeFunction: this.routingLambdaEdge.lambdaEdge

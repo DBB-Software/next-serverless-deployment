@@ -1,11 +1,12 @@
 import { Construct } from 'constructs'
-import { type StackProps } from 'aws-cdk-lib'
+import * as cdk from 'aws-cdk-lib'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
+import * as logs from 'aws-cdk-lib/aws-logs'
 import path from 'node:path'
 import { buildLambda } from '../../build/edge'
 
-interface RoutingLambdaEdgeProps extends StackProps {
+interface RoutingLambdaEdgeProps extends cdk.StackProps {
   bucketName: string
   ebAppDomain: string
   buildOutputPath: string
@@ -33,10 +34,18 @@ export class RoutingLambdaEdge extends Construct {
       }
     })
 
+    const logGroup = new logs.LogGroup(this, 'RoutingLambdaEdgeLogGroup', {
+      logGroupName: '/aws/lambda/edgeRouting',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      retention: logs.RetentionDays.ONE_DAY
+    })
+
     this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'RoutingLambdaEdge', {
       runtime: nodeJSEnvironment,
       code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions')),
       handler: 'edgeRouting.handler'
     })
+
+    logGroup.grantWrite(this.lambdaEdge)
   }
 }

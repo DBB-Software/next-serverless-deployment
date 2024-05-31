@@ -2,12 +2,13 @@ import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import { BeanstalkDistribution } from '../constructs/BeanstalkDistribution'
-import { addOutput } from '../../utils/cdk'
+import { addOutput } from '../../common/cdk'
 
 export interface NextRenderServerStackProps extends cdk.StackProps {
   stage: string
   nodejs?: string
   isProduction?: boolean
+  version: string
 }
 
 export class NextRenderServerStack extends cdk.Stack {
@@ -16,14 +17,22 @@ export class NextRenderServerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: NextRenderServerStackProps) {
     super(scope, id, props)
 
-    const { stage, nodejs, isProduction } = props
-    const appName = `${id}-${stage}`
+    const { stage, nodejs, isProduction, version } = props
 
-    this.staticBucket = new s3.Bucket(this, `${appName}-static`, {
-      removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY
+    this.staticBucket = new s3.Bucket(this, `${id}-static`, {
+      bucketName: `${id}-${version}-static`,
+      removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: !isProduction,
+      publicReadAccess: true,
+      blockPublicAccess: {
+        blockPublicAcls: false,
+        blockPublicPolicy: false,
+        ignorePublicAcls: false,
+        restrictPublicBuckets: false
+      }
     })
-    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}-eb`, {
-      appName,
+
+    this.elasticbeanstalk = new BeanstalkDistribution(this, 'ElasticBeanstalkDistribution', {
       stage,
       nodejs,
       isProduction

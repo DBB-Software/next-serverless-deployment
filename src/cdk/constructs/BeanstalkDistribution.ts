@@ -3,10 +3,9 @@ import * as elasticbeanstalk from 'aws-cdk-lib/aws-elasticbeanstalk'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import { RemovalPolicy } from 'aws-cdk-lib'
-import { addOutput } from '../../utils/cdk'
+import { addOutput } from '../../common/cdk'
 
 interface BeanstalkDistributionProps {
-  appName: string
   stage: string
   nodejs?: string
   isProduction?: boolean
@@ -27,18 +26,18 @@ export class BeanstalkDistribution extends Construct {
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
-    const { appName, stage, nodejs, isProduction } = props
+    const { stage, nodejs, isProduction } = props
 
-    this.ebApp = new elasticbeanstalk.CfnApplication(this, `${appName}-app`, {
-      applicationName: appName
+    this.ebApp = new elasticbeanstalk.CfnApplication(this, 'EbApp', {
+      applicationName: 'EbApp'
     })
 
-    this.ebInstanceProfileRole = new iam.Role(this, `${appName}-instance-profile-role`, {
+    this.ebInstanceProfileRole = new iam.Role(this, 'EbInstanceProfileRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkWebTier')]
     })
 
-    this.ebInstanceProfile = new iam.CfnInstanceProfile(this, `${appName}-instance-profile`, {
+    this.ebInstanceProfile = new iam.CfnInstanceProfile(this, 'EbInstanceProfile', {
       roles: [this.ebInstanceProfileRole.roleName]
     })
 
@@ -47,9 +46,9 @@ export class BeanstalkDistribution extends Construct {
     // Available platforms: https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platforms-supported.html#platforms-supported.nodejs
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
 
-    this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, `${appName}-env`, {
-      environmentName: `${appName}-env`,
-      applicationName: this.ebApp.applicationName ?? `${appName}-app`,
+    this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, 'EbEnv', {
+      environmentName: 'NextServerEnv',
+      applicationName: this.ebApp.applicationName!,
       solutionStackName: nodeJSEnvironment,
       optionSettings: [
         {
@@ -75,8 +74,9 @@ export class BeanstalkDistribution extends Construct {
       ]
     })
 
-    this.ebS3 = new s3.Bucket(this, `${appName}-versions`, {
-      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
+    this.ebS3 = new s3.Bucket(this, 'EbVersions', {
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      autoDeleteObjects: !isProduction
     })
 
     addOutput(this, 'BeanstalkDomain', this.ebEnv.attrEndpointUrl)

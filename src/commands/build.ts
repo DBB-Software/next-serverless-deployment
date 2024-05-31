@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'path'
-import { getProjectSettings } from '../utils'
+import { getProjectSettings } from '../common/project'
 import { buildNextApp } from '../build/next'
 
 const OUTPUT_FOLDER = 'dbbs-next'

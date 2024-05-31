@@ -36,13 +36,7 @@ export class CloudFrontDistribution extends Construct {
           origin: new origins.HttpOrigin(ebAppDomain, {
             protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY
           }),
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          edgeLambdas: [
-            {
-              functionVersion: edgeFunction.currentVersion,
-              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
-            }
-          ]
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL
         }
       }
     })

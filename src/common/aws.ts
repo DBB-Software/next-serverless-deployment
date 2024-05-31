@@ -30,6 +30,7 @@ export const getAWSCredentials = async (props: GetAWSBasicProps) => {
 
 export const getSTSIdentity = async (props: GetAWSBasicProps) => {
   const stsClient = new STSClient({
+    region: props?.region,
     credentials: await getAWSCredentials(props)
   })
 
