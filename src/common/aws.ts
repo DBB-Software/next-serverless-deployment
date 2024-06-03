@@ -39,8 +39,28 @@ export const getSTSIdentity = async (props: GetAWSBasicProps) => {
   return identity
 }
 
+export const getFileContentType = (filePath?: string) => {
+  if (!filePath) return
+
+  const extension = path.extname(filePath)
+
+  switch (extension) {
+    case '.css':
+      return 'text/css'
+    case '.js':
+      return 'application/javascript'
+    case '..html':
+      return 'text/html'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
 export const uploadFileToS3 = async (s3Client: S3, options: PutObjectCommandInput) => {
-  return s3Client.putObject(options)
+  return s3Client.putObject({
+    ...options,
+    ContentType: getFileContentType(options.Key)
+  })
 }
 
 export const uploadFolderToS3 = async (s3Client: S3, options: S3UploadFolderOptions) => {
