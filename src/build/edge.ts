@@ -16,9 +16,9 @@ export const buildLambda = (name: string, outDir: string, options?: BuildOptions
   })
 
   if (res.errors?.length > 0) {
-    res.errors.forEach((err) => console.error(err))
+    res.errors.forEach((err) => console.error('Build lambda error:', err))
 
-    throw new Error('Error during bundling edge function')
+    throw new Error('Error during building lambda function')
   }
 
   return resultedFile

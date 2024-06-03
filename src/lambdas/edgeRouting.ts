@@ -4,6 +4,36 @@ import https from 'https'
 
 const s3 = new S3Client()
 
+async function makeHTTPRequest(options: https.RequestOptions): Promise<{
+  body: string
+  statusCode?: number
+  statusMessage?: string
+}> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let data = ''
+
+      res.on('data', (chunk) => {
+        data += chunk
+      })
+
+      res.on('end', () => {
+        resolve({
+          body: data,
+          statusCode: res.statusCode,
+          statusMessage: res.statusMessage
+        })
+      })
+    })
+
+    req.on('error', (e) => {
+      reject(e)
+    })
+
+    req.end()
+  })
+}
+
 export const handler = async (
   event: CloudFrontRequestEvent,
   context: any,
@@ -34,35 +64,15 @@ export const handler = async (
         method: 'GET'
       }
 
-      const req = https.request(options, (res) => {
-        let data = ''
+      const { body, statusCode, statusMessage } = await makeHTTPRequest(options)
 
-        res.on('data', (chunk) => {
-          data += chunk
-        })
+      const response: CloudFrontRequestResult = {
+        status: statusCode?.toString() || '500',
+        statusDescription: statusMessage || 'Internal Server Error',
+        body
+      }
 
-        res.on('end', () => {
-          const response: CloudFrontRequestResult = {
-            status: res.statusCode?.toString() || '500',
-            statusDescription: res.statusMessage || 'Internal Server Error',
-            body: data
-          }
-
-          callback(null, response)
-        })
-      })
-
-      req.on('error', (e) => {
-        const response: CloudFrontRequestResult = {
-          status: '500',
-          statusDescription: 'Internal Server Error',
-          body: `Error: ${e.message}`
-        }
-
-        callback(null, response)
-      })
-
-      req.end()
+      callback(null, response)
     } else {
       // For other errors, return a 500 response
       const response: CloudFrontRequestResult = {
