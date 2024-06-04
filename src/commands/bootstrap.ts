@@ -1,5 +1,5 @@
 import childProcess from 'node:child_process'
-import { getAWSCredentials, getSTSIdentity } from '../utils/aws'
+import { getAWSCredentials, getSTSIdentity } from '../common/aws'
 
 interface BootstrapProps {
   region?: string

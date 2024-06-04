@@ -1,18 +1,9 @@
-import childProcess from 'node:child_process'
 import fs from 'node:fs'
 import path from 'path'
-import { getProjectSettings, ProjectPackager } from '../utils'
+import { getProjectSettings } from '../common/project'
+import { buildNextApp } from '../build/next'
 
 const OUTPUT_FOLDER = 'dbbs-next'
-
-const setNextOptions = () => {
-  // Same as `target: "standalone"` in next.config.js
-  process.env.NEXT_PRIVATE_STANDALONE = 'true'
-}
-
-const buildNextApp = (packager: ProjectPackager) => {
-  childProcess.execSync(packager.buildCommand, { stdio: 'inherit' })
-}
 
 const createOutputFolder = () => {
   const outputFolderPath = path.join(process.cwd(), OUTPUT_FOLDER)
@@ -28,17 +19,17 @@ const copyAssets = (outputPath: string, appPath: string, appRelativePath: string
   // Copying static assets (like js, css, images, .etc)
   fs.cpSync(path.join(appPath, '.next', 'static'), path.join(outputPath, '_next', 'static'), { recursive: true })
 
-  fs.cpSync(path.join(appPath, '.next', 'standalone'), outputPath, {
+  fs.cpSync(path.join(appPath, '.next', 'standalone'), path.join(outputPath, 'server'), {
     recursive: true
   })
   if (appRelativePath && appRelativePath !== '/') {
-    fs.cpSync(path.join(outputPath, appRelativePath), outputPath, { recursive: true })
-    fs.rmSync(path.join(outputPath, appRelativePath), { recursive: true })
+    fs.cpSync(path.join(outputPath, 'server', appRelativePath), path.join(outputPath, 'server'), { recursive: true })
+    fs.rmSync(path.join(outputPath, 'server', appRelativePath), { recursive: true })
   }
 }
 
 const modifyRunCommand = (outputPath: string) => {
-  const packageFilePath = path.join(outputPath, 'package.json')
+  const packageFilePath = path.join(outputPath, 'server', 'package.json')
 
   const packageFile = JSON.parse(fs.readFileSync(packageFilePath, { encoding: 'utf-8' }).toString())
 
@@ -48,7 +39,7 @@ const modifyRunCommand = (outputPath: string) => {
   fs.writeFileSync(packageFilePath, JSON.stringify(packageFile))
 }
 
-export const buildApp = () => {
+export const buildApp = async () => {
   const currentPath = process.cwd()
   const settings = getProjectSettings(currentPath)
 
@@ -58,10 +49,9 @@ export const buildApp = () => {
 
   const { packager, root: rootPath } = settings
   const appRelativePath = path.relative(rootPath, currentPath)
-
-  setNextOptions()
-  buildNextApp(packager)
   const outputPath = createOutputFolder()
+
+  buildNextApp(packager)
   copyAssets(outputPath, currentPath, appRelativePath)
   modifyRunCommand(outputPath)
 
