@@ -4,7 +4,7 @@
   "description": "",
   "main": "./dist/index.js",
   "bin": {
-    "@dbbs/next-serverless-deployment": "./dist/index.js"
+    "next-serverless-deployment": "./dist/index.js"
   },
   "exports": {
     "./*": "./dist/*"
@@ -43,15 +43,18 @@
     "typescript": "5.4.5"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "3.588.0",
-    "@aws-sdk/client-elastic-beanstalk": "3.588.0",
-    "@aws-sdk/client-s3": "3.588.0",
-    "@aws-sdk/client-sts": "3.588.0",
-    "@aws-sdk/credential-providers": "3.588.0",
+    "@aws-sdk/client-cloudformation": "3.590.0",
+    "@aws-sdk/client-cloudfront": "3.590.0",
+    "@aws-sdk/client-elastic-beanstalk": "3.590.0",
+    "@aws-sdk/client-s3": "3.591.0",
+    "@aws-sdk/client-sts": "3.590.0",
+    "@aws-sdk/credential-providers": "3.590.0",
     "@aws-sdk/util-endpoints": "3.587.0",
-    "aws-cdk-lib": "2.141.0",
-    "aws-sdk": "2.1628.0",
-    "cdk-assets": "2.143.0",
+    "@dbbs/next-cache-handler-core": "1.0.7",
+    "@dbbs/next-cache-handler-s3": "1.0.8",
+    "aws-cdk-lib": "2.144.0",
+    "aws-sdk": "2.1635.0",
+    "cdk-assets": "2.144.0",
     "constructs": "10.3.0",
     "yargs": "17.7.2"
   }

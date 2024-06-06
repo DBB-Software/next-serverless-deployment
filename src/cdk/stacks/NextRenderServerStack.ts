@@ -8,19 +8,22 @@ export interface NextRenderServerStackProps extends cdk.StackProps {
   stage: string
   nodejs?: string
   isProduction?: boolean
-  version: string
+  region: string
 }
 
 export class NextRenderServerStack extends cdk.Stack {
   public readonly elasticbeanstalk: BeanstalkDistribution
   public readonly staticBucket: s3.Bucket
+  public readonly staticBucketName: string
+
   constructor(scope: Construct, id: string, props: NextRenderServerStackProps) {
     super(scope, id, props)
 
-    const { stage, nodejs, isProduction, version } = props
+    const { stage, nodejs, isProduction, region } = props
 
-    this.staticBucket = new s3.Bucket(this, `${id}-static`, {
-      bucketName: `${id}-${version}-static`,
+    this.staticBucketName = `${id}-static`
+    this.staticBucket = new s3.Bucket(this, this.staticBucketName, {
+      bucketName: this.staticBucketName,
       removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: !isProduction,
       publicReadAccess: true,
@@ -35,7 +38,9 @@ export class NextRenderServerStack extends cdk.Stack {
     this.elasticbeanstalk = new BeanstalkDistribution(this, 'ElasticBeanstalkDistribution', {
       stage,
       nodejs,
-      isProduction
+      isProduction,
+      staticS3Bucket: this.staticBucket,
+      region
     })
 
     addOutput(this, 'StaticBucketName', this.staticBucket.bucketName)

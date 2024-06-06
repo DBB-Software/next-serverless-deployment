@@ -9,6 +9,8 @@ interface BeanstalkDistributionProps {
   stage: string
   nodejs?: string
   isProduction?: boolean
+  staticS3Bucket: s3.Bucket
+  region: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
@@ -26,7 +28,7 @@ export class BeanstalkDistribution extends Construct {
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
-    const { stage, nodejs, isProduction } = props
+    const { stage, nodejs, isProduction, staticS3Bucket, region } = props
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, 'EbApp', {
       applicationName: 'EbApp'
@@ -36,6 +38,13 @@ export class BeanstalkDistribution extends Construct {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkWebTier')]
     })
+
+    this.ebInstanceProfileRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject', 's3:PutObjectAcl'],
+        resources: [`${staticS3Bucket.bucketArn}/*`]
+      })
+    )
 
     this.ebInstanceProfile = new iam.CfnInstanceProfile(this, 'EbInstanceProfile', {
       roles: [this.ebInstanceProfileRole.roleName]
@@ -55,6 +64,16 @@ export class BeanstalkDistribution extends Construct {
           namespace: 'aws:elasticbeanstalk:application:environment',
           optionName: 'NODE_ENV',
           value: stage
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:application:environment',
+          optionName: 'STATIC_BUCKET_NAME',
+          value: staticS3Bucket.bucketName
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:application:environment',
+          optionName: 'AWS_REGION',
+          value: region
         },
         {
           namespace: 'aws:elasticbeanstalk:environment',
