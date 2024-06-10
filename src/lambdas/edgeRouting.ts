@@ -52,12 +52,8 @@ function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers
 }
 
 function getS3ObjectPath(uri: string) {
-  const pageKey = uri.replace('/', '')
-
-  // Home page leaves under `index` path
-  if (!pageKey) {
-    return 'index/index.html'
-  }
+  // Home page in stored under `index` path
+  const pageKey = uri.replace('/', '') || 'index'
 
   return `${pageKey}/${pageKey}.html`
 }
