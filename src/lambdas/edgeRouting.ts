@@ -43,10 +43,10 @@ async function makeHTTPRequest(options: RequestOptions): Promise<{
 function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers']): RequestOptions['headers'] {
   if (!cloudfrontHeaders) return {}
 
-  Object.keys(cloudfrontHeaders).reduce((prev, key) => {
+  return Object.keys(cloudfrontHeaders).reduce((prev, key) => {
     return {
       ...prev,
-      [key]: cloudfrontHeaders[key]
+      [key]: cloudfrontHeaders[key].values
     }
   }, {})
 }
