@@ -81,11 +81,15 @@ sequenceDiagram
 
     User ->> CloudFront: Send Request
     CloudFront ->> Request Origin Lambda@Edge: 
-    Request Origin Lambda@Edge ->> S3Bucket: Sends request to S3Bucket origin when file exists here
-    Request Origin Lambda@Edge ->> ElasticBeanstalk with Load Balancer: Sends request to render page when it does not exist in S3
-    S3Bucket ->> CloudFront: returns cached file
-    ElasticBeanstalk with Load Balancer ->> CloudFront: returns generated page
-    ElasticBeanstalk with Load Balancer ->> S3Bucket: stores generated page
+    Request Origin Lambda@Edge ->> S3Bucket: Sends Head request to check if file exists in S3
+    alt File exists in S3
+      Request Origin Lambda@Edge ->> S3Bucket: Forwarding request to S3 origin
+      S3Bucket ->> CloudFront: returns cached file
+    else File does not exit
+      Request Origin Lambda@Edge ->> ElasticBeanstalk with Load Balancer: Sends request to render page when it does not exist in S3
+      ElasticBeanstalk with Load Balancer ->> CloudFront: returns generated page
+      ElasticBeanstalk with Load Balancer ->> S3Bucket: stores generated page
+    end
     CloudFront ->> User: returns page result
 ```
 
