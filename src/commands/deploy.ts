@@ -1,5 +1,6 @@
 import { ElasticBeanstalk } from '@aws-sdk/client-elastic-beanstalk'
 import { S3 } from '@aws-sdk/client-s3'
+import { CloudFront } from '@aws-sdk/client-cloudfront'
 import fs from 'node:fs'
 import childProcess from 'node:child_process'
 import path from 'node:path'
@@ -8,6 +9,9 @@ import { NextRenderServerStack, type NextRenderServerStackProps } from '../cdk/s
 import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stacks/NextCloudfrontStack'
 import { getAWSCredentials, uploadFolderToS3, uploadFileToS3 } from '../common/aws'
 import { AppStack } from '../common/cdk'
+import { getProjectSettings } from '../common/project'
+
+const OUTPUT_FOLDER = 'dbbs-next'
 
 export interface DeployConfig {
   siteName: string
@@ -33,118 +37,171 @@ export interface DeployStackProps {
   }
 }
 
+const cleanOutputFolder = () => {
+  const outputFolderPath = path.join(process.cwd(), OUTPUT_FOLDER)
+
+  fs.rmSync(outputFolderPath, { recursive: true, force: true })
+}
+
+const createOutputFolder = () => {
+  const outputFolderPath = path.join(process.cwd(), OUTPUT_FOLDER)
+  // clean folder before creating new build output.
+  cleanOutputFolder()
+
+  fs.mkdirSync(outputFolderPath)
+
+  return outputFolderPath
+}
+
 export const deploy = async (config: DeployConfig) => {
-  const { pruneBeforeDeploy = false, siteName, stage = 'development', aws } = config
-  const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
-  const region = aws.region || process.env.REGION
+  let cleanNextApp
+  try {
+    const { pruneBeforeDeploy = false, siteName, stage = 'development', aws } = config
+    const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
+    const region = aws.region || process.env.REGION
 
-  if (!credentials.accessKeyId || !credentials.secretAccessKey) {
-    throw new Error('AWS Credentials are required.')
-  }
-
-  // Build and zip app.
-  const { outputPath: buildOutputPath, buildFolderName } = await buildApp()
-  const now = Date.now()
-  const archivedFolderName = `${buildFolderName}-server-v${now}.zip`
-  const buildOutputPathArchived = path.join(buildOutputPath, archivedFolderName)
-  const versionLabel = `${buildFolderName}-server-v${now}`
-
-  fs.writeFileSync(path.join(buildOutputPath, 'server', 'Procfile'), 'web: node server.js')
-
-  childProcess.execSync(`cd ${path.join(buildOutputPath, 'server')} && zip -r ../${archivedFolderName} \\.* *`, {
-    stdio: 'inherit'
-  })
-
-  const clientAWSCredentials = {
-    region,
-    credentials: {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken
+    if (!credentials.accessKeyId || !credentials.secretAccessKey) {
+      throw new Error('AWS Credentials are required.')
     }
-  }
 
-  const ebClient = new ElasticBeanstalk(clientAWSCredentials)
-  const s3Client = new S3(clientAWSCredentials)
+    if (!region) {
+      throw new Error('AWS Region is required.')
+    }
 
-  // .toLowerCase() is required, since AWS has limitation for resources names
-  // that name must contain only lowercase characters.
-  if (/[A-Z]/.test(siteName)) {
-    console.warn(
-      'SiteName should not contain uppercase characters. Updating value to contain only lowercase characters.'
-    )
-  }
-  const siteNameLowerCased = siteName.toLowerCase()
+    const projectSettings = getProjectSettings(process.cwd())
 
-  const nextRenderServerStack = new AppStack<NextRenderServerStack, NextRenderServerStackProps>(
-    `${siteNameLowerCased}-server`,
-    NextRenderServerStack,
-    {
-      ...clientAWSCredentials,
-      pruneBeforeDeploy,
-      buildOutputPath,
-      profile: config.aws.profile,
-      stage,
-      version: now.toString(),
-      nodejs: config.nodejs,
-      isProduction: config.isProduction,
-      crossRegionReferences: true,
+    if (!projectSettings) {
+      throw new Error('Was not able to find project settings.')
+    }
+
+    const outputPath = createOutputFolder()
+
+    const clientAWSCredentials = {
       region,
-      env: {
-        region
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken
       }
     }
-  )
-  const nextRenderServerStackOutput = await nextRenderServerStack.deployStack().then(async (output) => {
-    // upload static assets.
+
+    const ebClient = new ElasticBeanstalk(clientAWSCredentials)
+    const s3Client = new S3(clientAWSCredentials)
+    const cloudfrontClient = new CloudFront(clientAWSCredentials)
+
+    // .toLowerCase() is required, since AWS has limitation for resources names
+    // that name must contain only lowercase characters.
+    if (/[A-Z]/.test(siteName)) {
+      console.warn(
+        'SiteName should not contain uppercase characters. Updating value to contain only lowercase characters.'
+      )
+    }
+    const siteNameLowerCased = siteName.toLowerCase()
+
+    const nextRenderServerStack = new AppStack<NextRenderServerStack, NextRenderServerStackProps>(
+      `${siteNameLowerCased}-server`,
+      NextRenderServerStack,
+      {
+        ...clientAWSCredentials,
+        pruneBeforeDeploy,
+        buildOutputPath: outputPath,
+        profile: config.aws.profile,
+        stage,
+        nodejs: config.nodejs,
+        isProduction: config.isProduction,
+        crossRegionReferences: true,
+        region,
+        env: {
+          region
+        }
+      }
+    )
+
+    const nextRenderServerStackOutput = await nextRenderServerStack.deployStack()
+
+    const nextCloudfrontStack = new AppStack<NextCloudfrontStack, NextCloudfrontStackProps>(
+      `${siteNameLowerCased}-cf`,
+      NextCloudfrontStack,
+      {
+        ...clientAWSCredentials,
+        pruneBeforeDeploy,
+        profile: config.aws.profile,
+        nodejs: config.nodejs,
+        staticBucketName: nextRenderServerStackOutput.StaticBucketName,
+        ebAppDomain: nextRenderServerStackOutput.BeanstalkDomain,
+        buildOutputPath: outputPath,
+        crossRegionReferences: true,
+        region,
+        env: {
+          region: 'us-east-1' // required since Edge can be deployed only here.
+        }
+      }
+    )
+    const nextCloudfrontStackOutput = await nextCloudfrontStack.deployStack()
+
+    // Build and zip app.
+    cleanNextApp = await buildApp({
+      projectSettings,
+      outputPath,
+      s3BucketName: nextRenderServerStackOutput.StaticBucketName
+    })
+
+    const now = Date.now()
+    const archivedFolderName = `${OUTPUT_FOLDER}-server-v${now}.zip`
+    const buildOutputPathArchived = path.join(outputPath, archivedFolderName)
+    const versionLabel = `${OUTPUT_FOLDER}-server-v${now}`
+
+    fs.writeFileSync(
+      path.join(outputPath, 'server', 'Procfile'),
+      `web: node ${path.join(path.relative(projectSettings.root, projectSettings.projectPath), 'server.js')}`
+    )
+
+    childProcess.execSync(`cd ${path.join(outputPath, 'server')} && zip -r ../${archivedFolderName} \\.* *`, {
+      stdio: 'inherit'
+    })
+
     await uploadFolderToS3(s3Client, {
-      Bucket: output.StaticBucketName,
+      Bucket: nextRenderServerStackOutput.StaticBucketName,
       Key: '_next',
-      folderRootPath: buildOutputPath
+      folderRootPath: outputPath
     })
 
     // upload code version to bucket.
     await uploadFileToS3(s3Client, {
-      Bucket: output.BeanstalkVersionsBucketName,
+      Bucket: nextRenderServerStackOutput.BeanstalkVersionsBucketName,
       Key: `${versionLabel}.zip`,
       Body: fs.readFileSync(buildOutputPathArchived)
     })
 
     await ebClient.createApplicationVersion({
-      ApplicationName: output.BeanstalkApplicationName,
+      ApplicationName: nextRenderServerStackOutput.BeanstalkApplicationName,
       VersionLabel: versionLabel,
       SourceBundle: {
-        S3Bucket: output.BeanstalkVersionsBucketName,
+        S3Bucket: nextRenderServerStackOutput.BeanstalkVersionsBucketName,
         S3Key: `${versionLabel}.zip`
       }
     })
 
     await ebClient.updateEnvironment({
-      ApplicationName: output.BeanstalkApplicationName,
-      EnvironmentName: output.BeanstalkEnvironmentName,
+      ApplicationName: nextRenderServerStackOutput.BeanstalkApplicationName,
+      EnvironmentName: nextRenderServerStackOutput.BeanstalkEnvironmentName,
       VersionLabel: versionLabel
     })
 
-    return output
-  })
-
-  const nextCloudfrontStack = new AppStack<NextCloudfrontStack, NextCloudfrontStackProps>(
-    `${siteNameLowerCased}-cf`,
-    NextCloudfrontStack,
-    {
-      ...clientAWSCredentials,
-      pruneBeforeDeploy,
-      profile: config.aws.profile,
-      nodejs: config.nodejs,
-      staticBucketName: nextRenderServerStackOutput.StaticBucketName,
-      ebAppDomain: nextRenderServerStackOutput.BeanstalkDomain,
-      buildOutputPath,
-      crossRegionReferences: true,
-      region,
-      env: {
-        region: 'us-east-1' // required since Edge can be deployed only here.
+    await cloudfrontClient.createInvalidation({
+      DistributionId: nextCloudfrontStackOutput.CloudfrontDistributionId!,
+      InvalidationBatch: {
+        CallerReference: `deploy-cache-invalidation-${now}`,
+        Paths: {
+          Quantity: 1,
+          Items: ['/*']
+        }
       }
-    }
-  )
-  await nextCloudfrontStack.deployStack()
+    })
+  } catch (err) {
+    console.error('Failed to deploy:', err)
+  } finally {
+    cleanOutputFolder()
+    cleanNextApp?.()
+  }
 }

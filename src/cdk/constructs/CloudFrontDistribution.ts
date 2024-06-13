@@ -2,6 +2,7 @@ import { Construct } from 'constructs'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
+import { addOutput } from '../../common/cdk'
 
 interface CloudFrontPropsDistribution {
   staticBucket: s3.IBucket
@@ -40,5 +41,7 @@ export class CloudFrontDistribution extends Construct {
         }
       }
     })
+
+    addOutput(this, 'CloudfrontDistributionId', this.cf.distributionId)
   }
 }

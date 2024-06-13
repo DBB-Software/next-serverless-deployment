@@ -1,10 +1,16 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
-import { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequestResult } from 'aws-lambda'
-import https from 'https'
+import type {
+  CloudFrontRequestEvent,
+  CloudFrontRequestCallback,
+  CloudFrontRequestResult,
+  CloudFrontRequest,
+  Context
+} from 'aws-lambda'
+import https, { type RequestOptions } from 'https'
 
 const s3 = new S3Client()
 
-async function makeHTTPRequest(options: https.RequestOptions): Promise<{
+async function makeHTTPRequest(options: RequestOptions): Promise<{
   body: string
   statusCode?: number
   statusMessage?: string
@@ -34,14 +40,32 @@ async function makeHTTPRequest(options: https.RequestOptions): Promise<{
   })
 }
 
+function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers']): RequestOptions['headers'] {
+  if (!cloudfrontHeaders) return {}
+
+  return Object.keys(cloudfrontHeaders).reduce((prev, key) => {
+    return {
+      ...prev,
+      [key]: cloudfrontHeaders[key].values
+    }
+  }, {})
+}
+
+function getS3ObjectPath(uri: string) {
+  // Home page in stored under `index` path
+  const pageKey = uri.replace('/', '') || 'index'
+
+  return `${pageKey}/${pageKey}.html`
+}
+
 export const handler = async (
   event: CloudFrontRequestEvent,
-  context: any,
+  _context: Context,
   callback: CloudFrontRequestCallback
 ): Promise<void> => {
   const request = event.Records[0].cf.request
   const s3Bucket = process.env.S3_BUCKET as string
-  const s3Key = request.uri
+  const s3Key = getS3ObjectPath(request.uri)
   const ebAppUrl = process.env.EB_APP_URL as string
 
   try {
@@ -53,15 +77,26 @@ export const handler = async (
       })
     )
 
+    // Modify s3 path request
+    request.uri = s3Key
+    if (request.origin?.s3) {
+      request.origin.s3 = {
+        ...request.origin.s3,
+        path: s3Key
+      }
+    }
+
     // If file exists, allow the request to proceed to S3
     callback(null, request)
-  } catch (error: any) {
+  } catch (_e) {
+    const error = _e as Error
     if (error.name === 'NotFound') {
       // If file does not exist, modify the request to go to Elastic Beanstalk
-      const options = {
+      const options: https.RequestOptions = {
         hostname: ebAppUrl,
         path: request.uri,
-        method: 'GET'
+        method: request.method,
+        headers: convertCloudFrontHeaders(request.headers)
       }
 
       const { body, statusCode, statusMessage } = await makeHTTPRequest(options)
