@@ -33,7 +33,7 @@ First of all need to bootstrap necessary components for AWS CDK:
 ```bash
 @dbbs/next-serverless-deployment bootstrap
 ```
-**Note**: this command should be called just once. It will call AWS CDK bootstrap to add ability to use cdk in your AWS account.
+>**_NOTE_**: this command should be called just once. It will call AWS CDK bootstrap to add ability to use cdk in your AWS account.
 
 Then to deploy NextJS app run the following command:
 ```
