@@ -18,7 +18,7 @@
 - **Cache Segmentation**: Dynamically segment application cache and user's experience based on cookies, query parameters and device type.
 - **Customizable**: Flexible configuration options to handle caching strategies for specific needs.
 - **Deployment**: Deploy your NextJS application just with a few commands.
-- **Self-Hosted**: Full control under infrastructure of your application.
+- **Self-Hosted**: Full control over infrastructure of your application.
 
 ## Quick Start
 ### Installation
@@ -33,9 +33,9 @@ First of all need to bootstrap necessary components for AWS CDK:
 ```bash
 @dbbs/next-serverless-deployment bootstrap
 ```
-Note: this command should be called just once. It will call AWS CDK bootstrap to add ability to use cdk in your AWS account.
+**Note**: this command should be called just once. It will call AWS CDK bootstrap to add ability to use cdk in your AWS account.
 
-Then to deploy NextJS app run:
+Then to deploy NextJS app run the following command:
 ```
 @dbbs/next-serverless-deployment deploy --siteName my-awesome-app --stage development
 ```
@@ -44,7 +44,7 @@ This command is going to create all necessary AWS resources (if they do not exis
 ## CLI
 
 ### bootstrap
-Adds support of CDK to AWS account. This needs to be called just once for specific AWS region.
+Creates all CDK resources for AWS account. This needs to be called just once for specific AWS region.
 ```bash
 @dbbs/next-serverless-deployment bootstrap
 ```
@@ -54,12 +54,12 @@ Creates AWS resources for NextJS application if they were not created. Bundles N
 ```bash
 @dbbs/next-serverless-deployment deploy
 ```
-### available parameters
+### Available parameters
 | Parameter Name    | Type    | Default value | Description                                                                                                                                                       |
 |-------------------|---------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | siteName          | string  | none          | Name which is going to be used for creating AWS resources                                                                                                         |
-| stage             | string  | none          | Prefix which is going to be added for AWS recources                                                                                                               |
-| pruneBeforeDeploy | boolean | false         | Going to clear all site data and resources before deployment                                                                                                      |
+| stage             | string  | none          | Adds prefix for AWS recource's names                                                                                                               |
+| pruneBeforeDeploy | boolean | false         | Clears all site data and resources before deployment                                                                                                      |
 | region            | string  | none          | AWS region. If parameter is empty going to read process.env.AWS_REGION                                                                                            |
 | profile           | string  | none          | AWS profile to use for credentials. If parameter is empty going to read credentials from:<br>process.env.AWS_ACCESS_KEY_ID and process.env.AWS_SECRET_ACCESS_KEY |
 | nodejs            | string  | 18            | Supports nodejs v18 and v20                                                                                                                                       |
