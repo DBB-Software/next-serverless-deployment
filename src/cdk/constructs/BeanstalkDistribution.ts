@@ -14,8 +14,8 @@ interface BeanstalkDistributionProps {
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
-  '18': '64bit Amazon Linux 2023 v6.1.5 running Node.js 18',
-  '20': '64bit Amazon Linux 2023 v6.1.5 running Node.js 20'
+  '18': '64bit Amazon Linux 2023 v6.1.6 running Node.js 18',
+  '20': '64bit Amazon Linux 2023 v6.1.6 running Node.js 20'
 }
 
 export class BeanstalkDistribution extends Construct {
