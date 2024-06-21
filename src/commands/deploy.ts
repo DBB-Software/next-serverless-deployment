@@ -4,14 +4,12 @@ import { CloudFront } from '@aws-sdk/client-cloudfront'
 import fs from 'node:fs'
 import childProcess from 'node:child_process'
 import path from 'node:path'
-import { buildApp } from '../commands/build'
+import { buildApp, OUTPUT_FOLDER } from '../build/next'
 import { NextRenderServerStack, type NextRenderServerStackProps } from '../cdk/stacks/NextRenderServerStack'
 import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stacks/NextCloudfrontStack'
-import { getAWSCredentials, uploadFolderToS3, uploadFileToS3 } from '../common/aws'
+import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION } from '../common/aws'
 import { AppStack } from '../common/cdk'
 import { getProjectSettings } from '../common/project'
-
-const OUTPUT_FOLDER = 'dbbs-next'
 
 export interface DeployConfig {
   siteName: string
@@ -133,7 +131,7 @@ export const deploy = async (config: DeployConfig) => {
         crossRegionReferences: true,
         region,
         env: {
-          region: 'us-east-1' // required since Edge can be deployed only here.
+          region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }
       }
     )
