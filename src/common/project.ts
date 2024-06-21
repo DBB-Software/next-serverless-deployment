@@ -18,7 +18,7 @@ export interface ProjectSettings {
 export const findPackager = (appPath: string): ProjectPackager | undefined => {
   return (
     [
-      { lockFile: 'package-lock.json', type: 'npm', buildCommand: 'npm ru build' },
+      { lockFile: 'package-lock.json', type: 'npm', buildCommand: 'npm run build' },
       { lockFile: 'yarn.lock', type: 'yarn', buildCommand: 'yarn build' },
       { lockFile: 'pnpm-lock.yaml', type: 'pnpm', buildCommand: 'pnpm build' }
     ] satisfies ProjectPackager[]
