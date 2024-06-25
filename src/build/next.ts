@@ -2,6 +2,7 @@ import childProcess from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { type ProjectPackager } from '../common/project'
+import loadConfig from '../cacheHandler/loadConfig'
 
 interface BuildOptions {
   packager: ProjectPackager
@@ -13,10 +14,15 @@ const setNextOptions = async (nextConfig: string, s3BucketName: string) => {
   // set s3 bucket name for cache handler during build time
   process.env.STATIC_BUCKET_NAME = s3BucketName
 
+  const serverConfig = await loadConfig()
   const currentConfig = await import(nextConfig).then((r) => r.default)
   const updatedConfig = {
     ...currentConfig,
     output: 'standalone',
+    serverRuntimeConfig: {
+      ...currentConfig.serverRuntimeConfig,
+      cacheConfig: serverConfig
+    },
     cacheHandler: require.resolve(path.join('..', 'cacheHandler', 'index.js'))
   }
 
