@@ -19,6 +19,8 @@ type GetAWSBasicProps =
 
 type S3UploadFolderOptions = PutObjectCommandInput & { folderRootPath: string; Key: string }
 
+export const AWS_EDGE_REGION = 'us-east-1'
+
 export const getAWSCredentials = async (props: GetAWSBasicProps) => {
   const credentials = await fromNodeProviderChain({
     ...(props && 'profile' in props && props.profile ? await fromIni({ profile: props.profile }) : await fromEnv()),
