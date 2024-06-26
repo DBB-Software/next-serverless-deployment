@@ -18,7 +18,7 @@ async function loadConfig(): Promise<CacheConfig | null> {
     const configPath = path.join(process.cwd(), serverConfig)
     return import(configPath).then((r) => r.default)
   } catch (e) {
-    console.error(e)
+    console.error('Failed to read next-serverless config', e)
     return null
   }
 }
