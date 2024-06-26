@@ -2,7 +2,7 @@ import childProcess from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { type ProjectPackager, type ProjectSettings } from '../common/project'
-import loadConfig from '../cacheHandler/loadConfig'
+import loadConfig from '../commands/helpers/loadConfig'
 
 interface BuildOptions {
   packager: ProjectPackager

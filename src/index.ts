@@ -14,6 +14,8 @@ interface CLIOptions {
   production?: boolean
 }
 
+export * from './types'
+
 const cli = yargs(hideBin(process.argv))
   .scriptName('@dbbs-next')
   .usage('$0 <command> [options]')
