@@ -4,7 +4,7 @@ import getConfig from 'next/config'
 import { CacheConfig } from '../types'
 
 const { serverRuntimeConfig } = getConfig()
-const config: CacheConfig = serverRuntimeConfig.cacheConfig
+const config: CacheConfig = serverRuntimeConfig.nextServerlessCacheConfig
 
 class ServerlessCache extends Cache {
   constructor(props: NextCacheHandlerContext) {

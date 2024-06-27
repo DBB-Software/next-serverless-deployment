@@ -56,7 +56,9 @@
     "cdk-assets": "2.144.0",
     "constructs": "10.3.0",
     "esbuild": "0.21.4",
-    "next": "^14.2.4",
     "yargs": "17.7.2"
+  },
+  "peerDependencies": {
+    "next": "^14.2.4"
   }
 }

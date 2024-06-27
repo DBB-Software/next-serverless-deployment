@@ -7,6 +7,7 @@ export const findConfig = (configPath: string): string | undefined => {
     fs.existsSync(path.join(configPath, config))
   )
 }
+
 async function loadConfig(): Promise<CacheConfig | null> {
   try {
     const serverConfig = findConfig(process.cwd())
