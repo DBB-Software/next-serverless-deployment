@@ -31,7 +31,7 @@ export class BeanstalkDistribution extends Construct {
     const { stage, nodejs, isProduction, staticS3Bucket, region } = props
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, 'EbApp', {
-      applicationName: 'EbApp'
+      applicationName: `${id}-eb-app`
     })
 
     this.ebInstanceProfileRole = new iam.Role(this, 'EbInstanceProfileRole', {

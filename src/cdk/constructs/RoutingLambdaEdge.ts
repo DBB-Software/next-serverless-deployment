@@ -35,7 +35,7 @@ export class RoutingLambdaEdge extends Construct {
     })
 
     const logGroup = new logs.LogGroup(this, 'RoutingLambdaEdgeLogGroup', {
-      logGroupName: '/aws/lambda/edgeRouting',
+      logGroupName: `/aws/lambda/${id}-edgeRouting`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.ONE_DAY
     })
