@@ -1,9 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const CONFIG_FILE_NAME = 'next-serverless.config.ts'
-const CONFIG_TEMPLATE = `import { CacheConfig } from '@dbbs/next-serverless-deployment/dist/types'
-const config: CacheConfig = {
+const CONFIG_FILE_NAME = 'next-serverless.config.js'
+const CONFIG_TEMPLATE = `/**
+ * @type {import('@dbbs/next-serverless-deployment/dist/types').CacheConfig}
+ */
+const config = {
   noCacheRoutes: [],
   cacheCookies: [],
   cacheQueries: [],
