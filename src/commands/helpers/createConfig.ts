@@ -3,7 +3,7 @@ import path from 'node:path'
 
 const CONFIG_FILE_NAME = 'next-serverless.config.js'
 const CONFIG_TEMPLATE = `/**
- * @type {import('@dbbs/next-serverless-deployment/dist/types').CacheConfig}
+ * @type {import('@dbbs/next-serverless-deployment').CacheConfig}
  */
 const config = {
   noCacheRoutes: [],
