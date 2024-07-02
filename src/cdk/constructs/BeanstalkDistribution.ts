@@ -11,6 +11,7 @@ interface BeanstalkDistributionProps {
   isProduction?: boolean
   staticS3Bucket: s3.Bucket
   region: string
+  appName: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
@@ -28,7 +29,7 @@ export class BeanstalkDistribution extends Construct {
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
-    const { stage, nodejs, isProduction, staticS3Bucket, region } = props
+    const { stage, nodejs, isProduction, staticS3Bucket, region, appName } = props
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, 'EbApp', {
       applicationName: `${id}-eb-app`
@@ -56,7 +57,7 @@ export class BeanstalkDistribution extends Construct {
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
 
     this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, 'EbEnv', {
-      environmentName: 'NextServerEnv',
+      environmentName: `${appName}-eb-env`,
       applicationName: this.ebApp.applicationName!,
       solutionStackName: nodeJSEnvironment,
       optionSettings: [
@@ -98,9 +99,9 @@ export class BeanstalkDistribution extends Construct {
       autoDeleteObjects: !isProduction
     })
 
-    addOutput(this, 'BeanstalkDomain', this.ebEnv.attrEndpointUrl)
-    addOutput(this, 'BeanstalkApplicationName', this.ebApp.applicationName!)
-    addOutput(this, 'BeanstalkEnvironmentName', this.ebEnv.environmentName!)
-    addOutput(this, 'BeanstalkVersionsBucketName', this.ebS3.bucketName)
+    addOutput(this, `${appName}-BeanstalkDomain`, this.ebEnv.attrEndpointUrl)
+    addOutput(this, `${appName}-BeanstalkApplicationName`, this.ebApp.applicationName!)
+    addOutput(this, `${appName}-BeanstalkEnvironmentName`, this.ebEnv.environmentName!)
+    addOutput(this, `${appName}-BeanstalkVersionsBucketName`, this.ebS3.bucketName)
   }
 }
