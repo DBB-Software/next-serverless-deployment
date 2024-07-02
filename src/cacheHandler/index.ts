@@ -6,7 +6,7 @@ import { CacheConfig } from '../types'
 const { serverRuntimeConfig } = getConfig() || {}
 const config: CacheConfig = serverRuntimeConfig?.nextServerlessCacheConfig
 
-config.noCacheRoutes?.forEach((route) => Cache.addNoCacheMatchers(route))
+config?.noCacheRoutes?.forEach((route) => Cache.addNoCacheMatchers(route))
 config?.cacheCookies?.forEach((cookie) => Cache.addCookie(cookie))
 config?.cacheQueries?.forEach((query) => Cache.addQuery(query))
 
