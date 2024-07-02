@@ -4,7 +4,7 @@ import getConfig from 'next/config'
 import { CacheConfig } from '../types'
 
 const { serverRuntimeConfig } = getConfig() || {}
-const config: CacheConfig = serverRuntimeConfig?.nextServerlessCacheConfig
+const config: CacheConfig | undefined = serverRuntimeConfig?.nextServerlessCacheConfig
 
 config?.noCacheRoutes?.forEach((route) => Cache.addNoCacheMatchers(route))
 config?.cacheCookies?.forEach((cookie) => Cache.addCookie(cookie))
