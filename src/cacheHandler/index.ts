@@ -3,8 +3,8 @@ import { S3Cache } from '@dbbs/next-cache-handler-s3'
 import getConfig from 'next/config'
 import { CacheConfig } from '../types'
 
-const { serverRuntimeConfig } = getConfig()
-const config: CacheConfig = serverRuntimeConfig.nextServerlessCacheConfig
+const { serverRuntimeConfig } = getConfig() || {}
+const config: CacheConfig = serverRuntimeConfig?.nextServerlessCacheConfig
 
 class ServerlessCache extends Cache {
   constructor(props: NextCacheHandlerContext) {

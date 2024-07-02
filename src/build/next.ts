@@ -36,9 +36,16 @@ const setNextOptions = async (nextConfig: string, s3BucketName: string) => {
 
   const currentContent = fs.readFileSync(nextConfig, 'utf-8')
 
-  fs.writeFileSync(nextConfig, `module.exports = ${JSON.stringify(updatedConfig, null, 4)};\n`, 'utf-8')
+  let updatedContent = `module.exports = ${JSON.stringify(updatedConfig, null, 4)};\n`
 
-  // function to revert back to original content of file.
+  // Check if the file has .mjs extension
+  if (nextConfig.endsWith('.mjs')) {
+    updatedContent = `export default ${JSON.stringify(updatedConfig, null, 4)};\n`
+  }
+
+  fs.writeFileSync(nextConfig, updatedContent, 'utf-8')
+
+  // Function to revert back to original content of file
   return () => {
     fs.writeFileSync(nextConfig, currentContent, 'utf-8')
   }
