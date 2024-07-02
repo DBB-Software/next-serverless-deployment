@@ -160,9 +160,11 @@ export class AppStack<T extends cdk.Stack, U> {
     const currentStackInfo = await this.describeCurrentStack()
 
     return (currentStackInfo?.Outputs ?? []).reduce((prev: Record<string, string>, curr) => {
+      const key = curr.ExportName!.split('-').pop()!
+
       return {
         ...prev,
-        [curr.ExportName as string]: curr.OutputValue!
+        [key]: curr.OutputValue!
       }
     }, {})
   }

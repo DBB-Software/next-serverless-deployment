@@ -42,6 +42,6 @@ export class CloudFrontDistribution extends Construct {
       }
     })
 
-    addOutput(this, 'CloudfrontDistributionId', this.cf.distributionId)
+    addOutput(this, `${id}-CloudfrontDistributionId`, this.cf.distributionId)
   }
 }
