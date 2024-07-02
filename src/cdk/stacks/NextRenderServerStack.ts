@@ -35,14 +35,15 @@ export class NextRenderServerStack extends cdk.Stack {
       }
     })
 
-    this.elasticbeanstalk = new BeanstalkDistribution(this, 'ElasticBeanstalkDistribution', {
+    this.elasticbeanstalk = new BeanstalkDistribution(this, `${id}-ElasticBeanstalkDistribution`, {
       stage,
       nodejs,
       isProduction,
       staticS3Bucket: this.staticBucket,
-      region
+      region,
+      appName: id
     })
 
-    addOutput(this, 'StaticBucketName', this.staticBucket.bucketName)
+    addOutput(this, `${id}-StaticBucketName`, this.staticBucket.bucketName)
   }
 }

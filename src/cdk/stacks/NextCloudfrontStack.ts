@@ -20,19 +20,19 @@ export class NextCloudfrontStack extends Stack {
     super(scope, id, props)
     const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region } = props
 
-    this.routingLambdaEdge = new RoutingLambdaEdge(this, 'RoutingLambdaEdge', {
+    this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
       ebAppDomain,
       buildOutputPath
     })
 
-    const staticBucket = s3.Bucket.fromBucketAttributes(this, 'StaticAssetsBucket', {
+    const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
       bucketName: staticBucketName,
       region
     })
 
-    this.cloudfront = new CloudFrontDistribution(this, 'NextCloudFront', {
+    this.cloudfront = new CloudFrontDistribution(this, `${id}-NextCloudFront`, {
       staticBucket,
       ebAppDomain,
       edgeFunction: this.routingLambdaEdge.lambdaEdge
