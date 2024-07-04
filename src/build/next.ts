@@ -2,6 +2,7 @@ import childProcess from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { type ProjectPackager, type ProjectSettings } from '../common/project'
+import loadConfig from '../commands/helpers/loadConfig'
 
 interface BuildOptions {
   packager: ProjectPackager
@@ -21,18 +22,30 @@ const setNextOptions = async (nextConfig: string, s3BucketName: string) => {
   // set s3 bucket name for cache handler during build time
   process.env.STATIC_BUCKET_NAME = s3BucketName
 
+  const serverConfig = await loadConfig()
   const currentConfig = await import(nextConfig).then((r) => r.default)
   const updatedConfig = {
     ...currentConfig,
     output: 'standalone',
+    serverRuntimeConfig: {
+      ...currentConfig.serverRuntimeConfig,
+      nextServerlessCacheConfig: serverConfig
+    },
     cacheHandler: require.resolve(path.join('..', 'cacheHandler', 'index.js'))
   }
 
   const currentContent = fs.readFileSync(nextConfig, 'utf-8')
 
-  fs.writeFileSync(nextConfig, `module.exports = ${JSON.stringify(updatedConfig, null, 4)};\n`, 'utf-8')
+  let updatedContent = `module.exports = ${JSON.stringify(updatedConfig, null, 4)};\n`
 
-  // function to revert back to original content of file.
+  // Check if the file has .mjs extension
+  if (nextConfig.endsWith('.mjs')) {
+    updatedContent = `export default ${JSON.stringify(updatedConfig, null, 4)};\n`
+  }
+
+  fs.writeFileSync(nextConfig, updatedContent, 'utf-8')
+
+  // Function to revert back to original content of file
   return () => {
     fs.writeFileSync(nextConfig, currentContent, 'utf-8')
   }

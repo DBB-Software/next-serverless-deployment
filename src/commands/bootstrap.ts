@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import { getAWSCredentials, getSTSIdentity, AWS_EDGE_REGION } from '../common/aws'
 import { getProjectSettings } from '../common/project'
 import { OUTPUT_FOLDER } from '../build/next'
+import { createConfigFile } from './helpers/createConfig'
 
 interface BootstrapProps {
   region?: string
@@ -63,6 +64,9 @@ export const bootstrap = async ({ region, profile }: BootstrapProps) => {
     AWS_REGION: awsRegion,
     AWS_PROFILE: profile
   }
+
+  // Creates a config file for the user
+  createConfigFile()
 
   runTask(`npx cdk bootstrap aws://${identity.Account}/${awsRegion}`, taskEnv)
 
