@@ -22,14 +22,14 @@ const setNextOptions = async (nextConfig: string, s3BucketName: string) => {
   // set s3 bucket name for cache handler during build time
   process.env.STATIC_BUCKET_NAME = s3BucketName
 
-  const serverConfig = await loadConfig()
+  const cacheConfig = await loadConfig()
   const currentConfig = await import(nextConfig).then((r) => r.default)
   const updatedConfig = {
     ...currentConfig,
     output: 'standalone',
     serverRuntimeConfig: {
       ...currentConfig.serverRuntimeConfig,
-      nextServerlessCacheConfig: serverConfig
+      nextServerlessCacheConfig: cacheConfig
     },
     cacheHandler: require.resolve(path.join('..', 'cacheHandler', 'index.js'))
   }

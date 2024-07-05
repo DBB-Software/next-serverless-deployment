@@ -10,6 +10,7 @@ import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stack
 import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION } from '../common/aws'
 import { AppStack } from '../common/cdk'
 import { getProjectSettings } from '../common/project'
+import loadConfig from './helpers/loadConfig'
 
 export interface DeployConfig {
   siteName: string
@@ -72,6 +73,8 @@ export const deploy = async (config: DeployConfig) => {
       throw new Error('Was not able to find project settings.')
     }
 
+    const cacheConfig = await loadConfig()
+
     const outputPath = createOutputFolder()
 
     const clientAWSCredentials = {
@@ -130,6 +133,7 @@ export const deploy = async (config: DeployConfig) => {
         buildOutputPath: outputPath,
         crossRegionReferences: true,
         region,
+        cacheConfig,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }
