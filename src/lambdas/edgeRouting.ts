@@ -88,6 +88,22 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   }
 }
 
+async function checkFileExistsInS3(s3Bucket: string, s3Key: string): Promise<boolean> {
+  try {
+    await s3.send(
+      new HeadObjectCommand({
+        Bucket: s3Bucket,
+        Key: s3Key
+      })
+    )
+    return true
+  } catch (e) {
+    if ((e as Error).name?.includes('NotFound')) return false
+
+    throw e
+  }
+}
+
 export const handler = async (
   event: CloudFrontRequestEvent,
   _context: Context,
@@ -102,50 +118,37 @@ export const handler = async (
 
   try {
     // Check if file exists in S3
-    await s3.send(
-      new HeadObjectCommand({
-        Bucket: s3Bucket,
-        Key: s3Key
-      })
-    )
-    // Modify s3 path request
-    request.uri = `/${s3Key}`
-    request.headers['content-type'] = [{ key: 'Content-Type', value: contentType }]
+    const isFileExists = await checkFileExistsInS3(s3Bucket, s3Key)
 
-    // If file exists, allow the request to proceed to S3
-    callback(null, request)
-  } catch (_e) {
-    const error = _e as Error
-    if (error.name?.includes('NotFound')) {
-      try {
-        // If file does not exist, modify the request to go to Elastic Beanstalk
-        const options: http.RequestOptions = {
-          hostname: ebAppUrl,
-          path: `${originalUri}${request.querystring ? `?${request.querystring}` : ''}`,
-          method: request.method,
-          headers: convertCloudFrontHeaders(request.headers)
-        }
+    if (isFileExists) {
+      // Modify s3 path request
+      request.uri = `/${s3Key}`
+      request.headers['content-type'] = [{ key: 'Content-Type', value: contentType }]
 
-        const { body, statusCode, statusMessage } = await makeHTTPRequest(options)
-
-        callback(null, {
-          status: statusCode?.toString() || '500',
-          statusDescription: statusMessage || 'Internal Server Error',
-          body
-        })
-      } catch (beanstalkError) {
-        callback(null, {
-          status: '500',
-          statusDescription: 'Internal Server Error',
-          body: `Error: ${(beanstalkError as Error).message}`
-        })
-      }
+      // If file exists, allow the request to proceed to S3
+      callback(null, request)
     } else {
+      const options: http.RequestOptions = {
+        hostname: ebAppUrl,
+        path: `${originalUri}${request.querystring ? `?${request.querystring}` : ''}`,
+        method: request.method,
+        headers: convertCloudFrontHeaders(request.headers)
+      }
+
+      const { body, statusCode, statusMessage } = await makeHTTPRequest(options)
+
       callback(null, {
-        status: '500',
-        statusDescription: 'Internal Server Error',
-        body: `Error: ${error.message}`
+        status: statusCode?.toString() || '500',
+        statusDescription: statusMessage || 'Internal Server Error',
+        body
       })
     }
+  } catch (_e) {
+    const error = _e as Error
+    callback(null, {
+      status: '500',
+      statusDescription: 'Internal Server Error',
+      body: `Error: ${error.message}`
+    })
   }
 }
