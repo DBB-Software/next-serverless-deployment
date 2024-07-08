@@ -13,6 +13,9 @@ interface CloudFrontPropsDistribution {
   cacheConfig: CacheConfig
 }
 
+const OneDayCache = Duration.days(1)
+const OneMonthCache = Duration.days(30)
+
 export class CloudFrontDistribution extends Construct {
   public readonly cf: cloudfront.Distribution
 
@@ -29,7 +32,7 @@ export class CloudFrontDistribution extends Construct {
       cookieBehavior: cacheConfig.cacheCookies?.length
         ? cloudfront.CacheCookieBehavior.allowList(...cacheConfig.cacheCookies)
         : cloudfront.CacheCookieBehavior.none(),
-      defaultTtl: Duration.days(1) // 1 day (default)
+      defaultTtl: OneDayCache // 1 day (default)
     })
 
     const longCachePolicy = new cloudfront.CachePolicy(this, 'LongCachePolicy', {
@@ -37,9 +40,9 @@ export class CloudFrontDistribution extends Construct {
       queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
       cookieBehavior: cloudfront.CacheCookieBehavior.none(),
       headerBehavior: cloudfront.CacheHeaderBehavior.none(),
-      defaultTtl: Duration.days(30), // 1 month
-      maxTtl: Duration.days(30), // 1 month
-      minTtl: Duration.days(30) // 1 month
+      defaultTtl: OneMonthCache, // 1 month
+      maxTtl: OneMonthCache, // 1 month
+      minTtl: OneMonthCache // 1 month
     })
 
     this.cf = new cloudfront.Distribution(this, id, {
