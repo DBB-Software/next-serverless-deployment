@@ -25,7 +25,7 @@ export class CloudFrontDistribution extends Construct {
     const { staticBucket, edgeFunction, cacheConfig } = props
 
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
-      cachePolicyName: `${id}-S3CachePolicy`,
+      cachePolicyName: `${id}-SplitCachePolicy`,
       queryStringBehavior: cacheConfig.cacheQueries?.length
         ? cloudfront.CacheQueryStringBehavior.allowList(...cacheConfig.cacheQueries)
         : cloudfront.CacheQueryStringBehavior.none(),
