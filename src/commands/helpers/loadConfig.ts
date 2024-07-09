@@ -8,7 +8,7 @@ export const findConfig = (configPath: string): string | undefined => {
   )
 }
 
-async function loadConfig(): Promise<CacheConfig | null> {
+async function loadConfig(): Promise<CacheConfig> {
   try {
     const serverConfig = findConfig(process.cwd())
 
@@ -19,8 +19,7 @@ async function loadConfig(): Promise<CacheConfig | null> {
     const configPath = path.join(process.cwd(), serverConfig)
     return import(configPath).then((r) => r.default)
   } catch (e) {
-    console.error('Failed to read next-serverless config', e)
-    return null
+    throw new Error('Could not load next-serverless.config.(js|mjs|ts)')
   }
 }
 

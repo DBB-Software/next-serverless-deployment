@@ -5,7 +5,7 @@ export const buildLambda = (name: string, outDir: string, options?: BuildOptions
   const resultedFile = path.join(outDir, 'server-functions', `${name}.js`)
   const res = buildSync({
     target: 'es2022',
-    format: 'esm',
+    format: 'cjs',
     platform: 'node',
     bundle: true,
     minify: true,

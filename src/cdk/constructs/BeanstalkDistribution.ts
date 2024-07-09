@@ -42,7 +42,7 @@ export class BeanstalkDistribution extends Construct {
 
     this.ebInstanceProfileRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: ['s3:PutObject', 's3:PutObjectAcl'],
+        actions: ['s3:Get*', 's3:Put*'],
         resources: [`${staticS3Bucket.bucketArn}/*`]
       })
     )
