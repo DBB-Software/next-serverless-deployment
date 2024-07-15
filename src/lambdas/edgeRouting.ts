@@ -1,6 +1,7 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
 import http, { type RequestOptions } from 'http'
+import crypto from 'crypto'
 import { CacheConfig } from '../types'
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
@@ -74,13 +75,18 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const pageKey = request.uri.replace('/', '') || 'index'
   const isJSON = request.headers['content-type']?.[0]?.value?.includes('json')
 
-  const cacheKey = [
-    pageKey,
-    buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
-    buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
-  ]
-    .filter(Boolean)
-    .join('-')
+  const cacheKey = crypto
+    .createHash('md5')
+    .update(
+      [
+        pageKey,
+        buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
+        buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
+      ]
+        .filter(Boolean)
+        .join('-')
+    )
+    .digest('hex')
 
   return {
     s3Key: `${pageKey}/${cacheKey}.${isJSON ? 'json' : 'html'}`,
