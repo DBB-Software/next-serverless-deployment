@@ -1,7 +1,7 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
 import http, { type RequestOptions } from 'http'
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 import { CacheConfig } from '../types'
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
