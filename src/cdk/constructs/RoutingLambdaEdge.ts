@@ -29,7 +29,7 @@ export class RoutingLambdaEdge extends Construct {
     const { bucketName, bucketRegion, ebAppDomain, nodejs, buildOutputPath, cacheConfig } = props
     super(scope, id)
 
-    const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
+    const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
 
     buildLambda('edgeRouting', buildOutputPath, {
       define: {
