@@ -52,9 +52,9 @@ export class BeanstalkDistribution extends Construct {
     })
 
     // Pass nodejs version to use for EB instance.
-    // Uses nodejs 18 as a fallback.
+    // Uses nodejs 20 as a fallback.
     // Available platforms: https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platforms-supported.html#platforms-supported.nodejs
-    const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['18']
+    const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
 
     this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, 'EbEnv', {
       environmentName: `${appName}-eb-env`,
