@@ -6,9 +6,9 @@ import { CacheConfig } from '../types'
 const { serverRuntimeConfig } = getConfig() || {}
 const config: CacheConfig | undefined = serverRuntimeConfig?.nextServerlessCacheConfig
 
-config?.noCacheRoutes?.forEach((route) => Cache.addNoCacheMatchers(route))
-config?.cacheCookies?.forEach((cookie) => Cache.addCookie(cookie))
-config?.cacheQueries?.forEach((query) => Cache.addQuery(query))
+Cache.addCookies(config?.cacheCookies ?? [])
+Cache.addQueries(config?.cacheQueries ?? [])
+Cache.addNoCacheMatchers(config?.noCacheRoutes ?? [])
 
 if (config?.enableDeviceSplit) {
   Cache.addDeviceSplit()
