@@ -13,8 +13,8 @@ interface CloudFrontPropsDistribution {
   cacheConfig: CacheConfig
 }
 
-const OneDayCache = Duration.days(1)
 const OneMonthCache = Duration.days(30)
+const NoCache = Duration.seconds(0)
 
 export class CloudFrontDistribution extends Construct {
   public readonly cf: cloudfront.Distribution
@@ -32,7 +32,9 @@ export class CloudFrontDistribution extends Construct {
       cookieBehavior: cacheConfig.cacheCookies?.length
         ? cloudfront.CacheCookieBehavior.allowList(...cacheConfig.cacheCookies)
         : cloudfront.CacheCookieBehavior.none(),
-      defaultTtl: OneDayCache // 1 day (default)
+      headerBehavior: cloudfront.CacheHeaderBehavior.allowList('Cache-Control'),
+      minTtl: NoCache,
+      defaultTtl: NoCache // no caching by default, cache value is going to be used from Cache-Control header.
     })
 
     const longCachePolicy = new cloudfront.CachePolicy(this, 'LongCachePolicy', {
@@ -40,14 +42,16 @@ export class CloudFrontDistribution extends Construct {
       queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
       cookieBehavior: cloudfront.CacheCookieBehavior.none(),
       headerBehavior: cloudfront.CacheHeaderBehavior.none(),
-      defaultTtl: OneMonthCache, // 1 month
-      maxTtl: OneMonthCache, // 1 month
-      minTtl: OneMonthCache // 1 month
+      defaultTtl: OneMonthCache,
+      maxTtl: OneMonthCache,
+      minTtl: OneMonthCache
     })
+
+    const s3Origin = new origins.S3Origin(staticBucket)
 
     this.cf = new cloudfront.Distribution(this, id, {
       defaultBehavior: {
-        origin: new origins.S3Origin(staticBucket),
+        origin: s3Origin,
         edgeLambdas: [
           {
             functionVersion: edgeFunction.currentVersion,
@@ -59,7 +63,7 @@ export class CloudFrontDistribution extends Construct {
       defaultRootObject: '',
       additionalBehaviors: {
         '/_next/*': {
-          origin: new origins.S3Origin(staticBucket),
+          origin: s3Origin,
           cachePolicy: longCachePolicy
         }
       }

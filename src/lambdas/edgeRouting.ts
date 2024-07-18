@@ -67,7 +67,16 @@ function transformCookiesToObject(cookies: Array<{ key?: string | undefined; val
 }
 
 function buildCacheKey(keys: string[], data: Record<string, string | string[]>, prefix: string) {
-  return keys.length ? `${prefix}(${keys.map((key) => `${key}=${data[key]}`).join('-')})` : ''
+  if (keys.length) {
+    const cacheString = keys
+      .map((key) => (data[key] ? `${key}=${data[key]}` : null))
+      .filter(Boolean)
+      .join('-')
+
+    return cacheString ? `${prefix}(${cacheString})` : null
+  }
+
+  return null
 }
 
 function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
@@ -75,22 +84,20 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const pageKey = request.uri.replace('/', '') || 'index'
   const isJSON = request.headers['content-type']?.[0]?.value?.includes('json')
 
-  const cacheKey = crypto
-    .createHash('md5')
-    .update(
-      [
-        pageKey,
-        buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
-        buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
-      ]
-        .filter(Boolean)
-        .join('-')
-    )
-    .digest('hex')
+  const cacheKey = [
+    pageKey,
+    buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
+    buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
+  ]
+    .filter(Boolean)
+    .join('-')
+  const md5CacheKey = crypto.createHash('md5').update(cacheKey).digest('hex')
 
   return {
-    s3Key: `${pageKey}/${cacheKey}.${isJSON ? 'json' : 'html'}`,
-    contentType: isJSON ? 'application/json' : 'text/html'
+    s3Key: `${pageKey}/${md5CacheKey}.${isJSON ? 'json' : 'html'}`,
+    contentType: isJSON ? 'application/json' : 'text/html',
+    cacheKey,
+    md5CacheKey
   }
 }
 
@@ -118,7 +125,7 @@ export const handler = async (
   const request = event.Records[0].cf.request
   const s3Bucket = process.env.S3_BUCKET!
   const cacheConfig = process.env.CACHE_CONFIG as CacheConfig
-  const { s3Key, contentType } = getS3ObjectPath(request, cacheConfig)
+  const { s3Key } = getS3ObjectPath(request, cacheConfig)
   const ebAppUrl = process.env.EB_APP_URL!
   const originalUri = request.uri
 
@@ -129,7 +136,6 @@ export const handler = async (
     if (isFileExists) {
       // Modify s3 path request
       request.uri = `/${s3Key}`
-      request.headers['content-type'] = [{ key: 'Content-Type', value: contentType }]
 
       // If file exists, allow the request to proceed to S3
       callback(null, request)
