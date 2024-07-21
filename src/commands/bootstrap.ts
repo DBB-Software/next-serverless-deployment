@@ -1,6 +1,6 @@
 import childProcess from 'node:child_process'
 import path from 'node:path'
-import fs from 'node:fs'
+import fs, { existsSync } from 'node:fs'
 import { getAWSCredentials, getSTSIdentity, AWS_EDGE_REGION } from '../common/aws'
 import { getProjectSettings } from '../common/project'
 import { OUTPUT_FOLDER } from '../build/next'
@@ -31,10 +31,11 @@ const runTask = (command: string, env: Record<string, string | undefined>) => {
 
 const updateGitIgnore = (projectPath: string) => {
   const gitIgnorePath = path.join(projectPath, '.gitignore')
-  const gitIgnore = fs.readFileSync(gitIgnorePath, 'utf8')
-  if (!gitIgnore.includes(OUTPUT_FOLDER)) {
-    fs.appendFileSync(gitIgnorePath, `\n#Next Serverless\n${OUTPUT_FOLDER}\n`)
+  const isExist = existsSync(gitIgnorePath)
+  if (isExist && fs.readFileSync(gitIgnorePath, 'utf8').includes(OUTPUT_FOLDER)) {
+    return
   }
+  fs.appendFileSync(gitIgnorePath, `${isExist ? '\n' : ''}#Next Serverless\n${OUTPUT_FOLDER}\n`)
 }
 
 export const bootstrap = async ({ region, profile }: BootstrapProps) => {
