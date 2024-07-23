@@ -5,6 +5,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
 import { addOutput } from '../../common/cdk'
 import { CacheConfig } from '../../types'
+import { HEADER_DEVICE_TYPE } from '../../constants'
 
 interface CloudFrontPropsDistribution {
   staticBucket: s3.IBucket
@@ -32,7 +33,7 @@ export class CloudFrontDistribution extends Construct {
       cookieBehavior: cacheConfig.cacheCookies?.length
         ? cloudfront.CacheCookieBehavior.allowList(...cacheConfig.cacheCookies)
         : cloudfront.CacheCookieBehavior.none(),
-      headerBehavior: cloudfront.CacheHeaderBehavior.allowList('Cache-Control'),
+      headerBehavior: cloudfront.CacheHeaderBehavior.allowList('Cache-Control', ...Object.values(HEADER_DEVICE_TYPE)),
       minTtl: NoCache,
       defaultTtl: NoCache // no caching by default, cache value is going to be used from Cache-Control header.
     })
