@@ -1,8 +1,8 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
 import http, { type RequestOptions } from 'http'
-import crypto from 'node:crypto'
 import { CacheConfig } from '../types'
+import { getS3ObjectPath } from '../common/utils'
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
 
@@ -45,60 +45,6 @@ function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers
       [key]: cloudfrontHeaders[key][0].value
     }
   }, {})
-}
-
-function transformQueryToObject(query: string) {
-  return query ? Object.fromEntries(new URLSearchParams(query).entries()) : {}
-}
-
-function transformCookiesToObject(cookies: Array<{ key?: string | undefined; value: string }>) {
-  if (!cookies?.length) return {}
-
-  return cookies.reduce(
-    (res, { value }) => {
-      value.split(';').forEach((cookie) => {
-        const [key, val] = cookie.split('=').map((part) => part.trim())
-        res[key] = val
-      })
-      return res
-    },
-    {} as Record<string, string>
-  )
-}
-
-function buildCacheKey(keys: string[], data: Record<string, string | string[]>, prefix: string) {
-  if (keys.length) {
-    const cacheString = keys
-      .map((key) => (data[key] ? `${key}=${data[key]}` : null))
-      .filter(Boolean)
-      .join('-')
-
-    return cacheString ? `${prefix}(${cacheString})` : null
-  }
-
-  return null
-}
-
-function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
-  // Home page in stored under `index` path
-  const pageKey = request.uri.replace('/', '') || 'index'
-  const isJSON = request.headers['content-type']?.[0]?.value?.includes('json')
-
-  const cacheKey = [
-    pageKey,
-    buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
-    buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
-  ]
-    .filter(Boolean)
-    .join('-')
-  const md5CacheKey = crypto.createHash('md5').update(cacheKey).digest('hex')
-
-  return {
-    s3Key: `${pageKey}/${md5CacheKey}.${isJSON ? 'json' : 'html'}`,
-    contentType: isJSON ? 'application/json' : 'text/html',
-    cacheKey,
-    md5CacheKey
-  }
 }
 
 async function checkFileExistsInS3(s3Bucket: string, s3Key: string): Promise<boolean> {
