@@ -1,5 +1,5 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
-import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
+import type { CloudFrontRequestEvent, CloudFrontRequestCallback, Context } from 'aws-lambda'
 import { type RequestOptions } from 'http'
 import { CacheConfig } from '../types'
 import { getS3ObjectPath, convertCloudFrontHeaders, makeHTTPRequest } from '../common/utils'
