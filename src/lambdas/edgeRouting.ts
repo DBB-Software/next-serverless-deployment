@@ -1,51 +1,10 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
-import http, { type RequestOptions } from 'http'
+import { type RequestOptions } from 'http'
 import { CacheConfig } from '../types'
-import { getS3ObjectPath } from '../common/utils'
+import { getS3ObjectPath, convertCloudFrontHeaders, makeHTTPRequest } from '../common/utils'
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
-
-async function makeHTTPRequest(options: RequestOptions): Promise<{
-  body: string
-  statusCode?: number
-  statusMessage?: string
-}> {
-  return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
-      let data = ''
-
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-
-      res.on('end', () => {
-        resolve({
-          body: data,
-          statusCode: res.statusCode,
-          statusMessage: res.statusMessage
-        })
-      })
-    })
-
-    req.on('error', (e) => {
-      reject(e)
-    })
-
-    req.end()
-  })
-}
-
-function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers']): RequestOptions['headers'] {
-  if (!cloudfrontHeaders) return {}
-
-  return Object.keys(cloudfrontHeaders).reduce((prev, key) => {
-    return {
-      ...prev,
-      [key]: cloudfrontHeaders[key][0].value
-    }
-  }, {})
-}
 
 async function checkFileExistsInS3(s3Bucket: string, s3Key: string): Promise<boolean> {
   try {
@@ -86,7 +45,7 @@ export const handler = async (
       // If file exists, allow the request to proceed to S3
       callback(null, request)
     } else {
-      const options: http.RequestOptions = {
+      const options: RequestOptions = {
         hostname: ebAppUrl,
         path: `${originalUri}${request.querystring ? `?${request.querystring}` : ''}`,
         method: request.method,
