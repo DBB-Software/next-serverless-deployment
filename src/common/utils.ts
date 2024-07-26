@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import type { CloudFrontRequest } from 'aws-lambda'
+import http, { type RequestOptions } from 'http'
 import { CacheConfig } from '../types'
 
 function transformQueryToObject(query: string) {
@@ -54,5 +55,46 @@ function transformQueryToObject(query: string) {
       cacheKey,
       md5CacheKey
     }
+  }
+
+  export async function makeHTTPRequest(options: RequestOptions): Promise<{
+    body: string
+    statusCode?: number
+    statusMessage?: string
+  }> {
+    return new Promise((resolve, reject) => {
+      const req = http.request(options, (res) => {
+        let data = ''
+  
+        res.on('data', (chunk) => {
+          data += chunk
+        })
+  
+        res.on('end', () => {
+          resolve({
+            body: data,
+            statusCode: res.statusCode,
+            statusMessage: res.statusMessage
+          })
+        })
+      })
+  
+      req.on('error', (e) => {
+        reject(e)
+      })
+  
+      req.end()
+    })
+  }
+  
+  export function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers']): RequestOptions['headers'] {
+    if (!cloudfrontHeaders) return {}
+  
+    return Object.keys(cloudfrontHeaders).reduce((prev, key) => {
+      return {
+        ...prev,
+        [key]: cloudfrontHeaders[key][0].value
+      }
+    }, {})
   }
   

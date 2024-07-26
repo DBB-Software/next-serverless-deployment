@@ -1,14 +1,15 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, Context } from 'aws-lambda'
+import { type RequestOptions } from 'http'
 import { CacheConfig } from '../types'
-import { getS3ObjectPath } from '../common/utils'
+import { convertCloudFrontHeaders, getS3ObjectPath, makeHTTPRequest } from '../common/utils'
 
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
 
 async function checkFileIsExpiredInS3(s3Bucket: string, s3Key: string): Promise<boolean> {
     try {
-      const { ExpiresString} = await s3.send(
+      const { ExpiresString } = await s3.send(
         new HeadObjectCommand({
           Bucket: s3Bucket,
           Key: s3Key
@@ -35,15 +36,28 @@ export const handler = async (
     const s3Bucket = process.env.S3_BUCKET!
     const cacheConfig = process.env.CACHE_CONFIG as CacheConfig
     const { s3Key } = getS3ObjectPath(request, cacheConfig)
+    const ebAppUrl = process.env.EB_APP_URL!
+    const originalUri = request.uri
 
     try {
         // Check if file is expired in S3
         const isFileExpired = await checkFileIsExpiredInS3(s3Bucket, s3Key)
     
         if (isFileExpired) {
-          // send request to revalidate file
-        
-        //   callback(null, request)
+          const options: RequestOptions = {
+            hostname: ebAppUrl,
+            path: `api/revalidate?path=${originalUri}${request.querystring ? `${request.querystring}` : ''}`,
+            method: request.method,
+            headers: convertCloudFrontHeaders(request.headers)
+          }
+    
+          const { body, statusCode, statusMessage } = await makeHTTPRequest(options)
+    
+          callback(null, {
+            status: statusCode?.toString() || '500',
+            statusDescription: statusMessage || 'Internal Server Error',
+            body
+          })
         return;
         }
         //continue execution
