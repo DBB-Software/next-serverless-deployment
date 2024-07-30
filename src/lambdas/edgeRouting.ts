@@ -3,6 +3,7 @@ import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontReque
 import http, { type RequestOptions } from 'http'
 import crypto from 'node:crypto'
 import { CacheConfig } from '../types'
+import { HEADER_DEVICE_TYPE } from '../constants'
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
 
@@ -36,15 +37,22 @@ async function makeHTTPRequest(options: RequestOptions): Promise<{
   })
 }
 
-function convertCloudFrontHeaders(cloudfrontHeaders?: CloudFrontRequest['headers']): RequestOptions['headers'] {
+function convertCloudFrontHeaders(
+  cloudfrontHeaders: CloudFrontRequest['headers'] | undefined,
+  allowHeaders?: string[]
+): RequestOptions['headers'] {
   if (!cloudfrontHeaders) return {}
 
-  return Object.keys(cloudfrontHeaders).reduce((prev, key) => {
-    return {
-      ...prev,
-      [key]: cloudfrontHeaders[key][0].value
-    }
-  }, {})
+  return Object.keys(cloudfrontHeaders).reduce(
+    (prev, key) =>
+      !allowHeaders?.length || allowHeaders.includes(key)
+        ? {
+            ...prev,
+            [key]: cloudfrontHeaders[key][0].value
+          }
+        : prev,
+    {}
+  )
 }
 
 function transformQueryToObject(query: string) {
@@ -79,6 +87,23 @@ function buildCacheKey(keys: string[], data: Record<string, string | string[]>, 
   return null
 }
 
+function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | undefined) {
+  const deviceHeaders = convertCloudFrontHeaders(headers, Object.values(HEADER_DEVICE_TYPE))
+  if (!deviceHeaders || !Object.keys(deviceHeaders).length) return null
+
+  if (deviceHeaders[HEADER_DEVICE_TYPE.Desktop] === 'true') {
+    return null
+  } else if (deviceHeaders[HEADER_DEVICE_TYPE.Mobile] === 'true') {
+    return 'mobile'
+  } else if (deviceHeaders[HEADER_DEVICE_TYPE.Tablet] === 'true') {
+    return 'tablet'
+  } else if (deviceHeaders[HEADER_DEVICE_TYPE.SmartTV] === 'true') {
+    return 'smarttv'
+  }
+
+  return null
+}
+
 function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   // Home page in stored under `index` path
   const pageKey = request.uri.replace('/', '') || 'index'
@@ -86,6 +111,7 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
 
   const cacheKey = [
     pageKey,
+    cacheConfig.enableDeviceSplit ? getCurrentDeviceType(request.headers) : null,
     buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
     buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
   ]
