@@ -1,8 +1,7 @@
 import { buildSync, type BuildOptions } from 'esbuild'
 import path from 'node:path'
 
-export const buildLambda = (name: string, outDir: string, options?: BuildOptions) => {
-  const resultedFile = path.join(outDir, 'server-functions', `${name}.js`)
+export const buildLambda = (names: string[], outDir: string, options?: BuildOptions) => {
   const res = buildSync({
     target: 'es2022',
     format: 'cjs',
@@ -10,8 +9,8 @@ export const buildLambda = (name: string, outDir: string, options?: BuildOptions
     bundle: true,
     minify: true,
     external: ['node:*', 'next', '@aws-sdk/*'],
-    entryPoints: [path.join(__dirname, '..', 'lambdas', `${name}.js`)],
-    outfile: resultedFile,
+    entryPoints: names.map((name) => path.join(__dirname, '..', 'lambdas', `${name}.js`)),
+    outdir: path.join(outDir, 'server-functions'),
     ...options
   })
 
@@ -20,6 +19,4 @@ export const buildLambda = (name: string, outDir: string, options?: BuildOptions
 
     throw new Error('Error during building lambda function')
   }
-
-  return resultedFile
 }

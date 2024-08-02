@@ -5,6 +5,7 @@ import { RoutingLambdaEdge } from '../constructs/RoutingLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { CacheConfig } from '../../types'
 import { CheckExpirationLambdaEdge } from '../constructs/CheckExpirationLambdaEdge'
+import { buildLambda } from '../../build/edge'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -24,6 +25,15 @@ export class NextCloudfrontStack extends Stack {
     super(scope, id, props)
     const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region, cacheConfig } = props
 
+    buildLambda(['edgeRouting', 'checkExpiration'], buildOutputPath, {
+      define: {
+        'process.env.S3_BUCKET': JSON.stringify(staticBucketName),
+        'process.env.S3_BUCKET_REGION': JSON.stringify(staticBucketName ?? ''),
+        'process.env.EB_APP_URL': JSON.stringify(ebAppDomain),
+        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig)
+      }
+    })
+
     this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
@@ -36,10 +46,7 @@ export class NextCloudfrontStack extends Stack {
     this.checkExpLambdaEdge = new CheckExpirationLambdaEdge(this, `${id}-CheckExpirationLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
-      ebAppDomain,
-      buildOutputPath,
-      cacheConfig,
-      bucketRegion: region
+      buildOutputPath
     })
 
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
@@ -50,8 +57,8 @@ export class NextCloudfrontStack extends Stack {
     this.cloudfront = new CloudFrontDistribution(this, `${id}-NextCloudFront`, {
       staticBucket,
       ebAppDomain,
-      requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
       responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
+      requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
       cacheConfig
     })
 

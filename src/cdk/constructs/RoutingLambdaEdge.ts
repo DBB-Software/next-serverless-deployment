@@ -5,7 +5,6 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as logs from 'aws-cdk-lib/aws-logs'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
-import { buildLambda } from '../../build/edge'
 import { CacheConfig } from '../../types'
 
 interface RoutingLambdaEdgeProps extends cdk.StackProps {
@@ -26,19 +25,10 @@ export class RoutingLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: RoutingLambdaEdgeProps) {
-    const { bucketName, bucketRegion, ebAppDomain, nodejs, buildOutputPath, cacheConfig } = props
+    const { bucketName, nodejs, buildOutputPath } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
-
-    buildLambda('edgeRouting', buildOutputPath, {
-      define: {
-        'process.env.S3_BUCKET': JSON.stringify(bucketName),
-        'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
-        'process.env.EB_APP_URL': JSON.stringify(ebAppDomain),
-        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig)
-      }
-    })
 
     const logGroup = new logs.LogGroup(this, 'RoutingLambdaEdgeLogGroup', {
       logGroupName: `/aws/lambda/${id}-edgeRouting`,
