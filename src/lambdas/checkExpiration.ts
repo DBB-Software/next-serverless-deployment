@@ -1,4 +1,4 @@
-import type { CloudFrontRequestEvent, CloudFrontRequestCallback, Context } from 'aws-lambda'
+import type { CloudFrontRequestCallback, Context, CloudFrontResponseEvent } from 'aws-lambda'
 
 function checkFileIsExpired(date: string): boolean {
   if (date) {
@@ -9,12 +9,12 @@ function checkFileIsExpired(date: string): boolean {
 }
 
 export const handler = async (
-  event: CloudFrontRequestEvent,
+  event: CloudFrontResponseEvent,
   _context: Context,
   callback: CloudFrontRequestCallback
 ): Promise<void> => {
-  const request = event.Records[0].cf.request
-  const headers = request.headers
+  const response = event.Records[0].cf.response
+  const headers = response.headers
 
   const expiresSrc = 'Expires'
   const cacheControlSrc = 'Cache-Control'
@@ -24,7 +24,7 @@ export const handler = async (
     if (headers[expiresSrc.toLowerCase()] && checkFileIsExpired(headers[expiresSrc.toLowerCase()][0].value)) {
       headers[cacheControlSrc.toLowerCase()] = [{ key: cacheControlSrc, value: 'no-cache' }]
     }
-    callback(null, request)
+    callback(null, response)
   } catch (_e) {
     const error = _e as Error
     callback(null, {
