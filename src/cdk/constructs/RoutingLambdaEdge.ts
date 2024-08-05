@@ -30,8 +30,9 @@ export class RoutingLambdaEdge extends Construct {
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
+    const name = 'edgeRouting'
 
-    buildLambda('edgeRouting', buildOutputPath, {
+    buildLambda(name, buildOutputPath, {
       define: {
         'process.env.S3_BUCKET': JSON.stringify(bucketName),
         'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
@@ -48,8 +49,8 @@ export class RoutingLambdaEdge extends Construct {
 
     this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'RoutingLambdaEdge', {
       runtime: nodeJSEnvironment,
-      code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions')),
-      handler: 'edgeRouting.handler',
+      code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', name)),
+      handler: 'index.handler',
       logGroup
     })
 

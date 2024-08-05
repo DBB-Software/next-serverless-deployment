@@ -2,7 +2,7 @@ import { buildSync, type BuildOptions } from 'esbuild'
 import path from 'node:path'
 
 export const buildLambda = (name: string, outDir: string, options?: BuildOptions) => {
-  const resultedFile = path.join(outDir, 'server-functions', `${name}.js`)
+  const resultedFile = path.join(outDir, 'server-functions', name, 'index.js')
   const res = buildSync({
     target: 'es2022',
     format: 'cjs',
