@@ -104,10 +104,25 @@ function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | undefined)
   return null
 }
 
+function getFileExtensionTypeFromRequest(request: CloudFrontRequest) {
+  const contentType = request.headers['content-type']?.[0]?.value ?? ''
+  const isRSC = request.querystring.includes('_rsc')
+
+  if (isRSC) {
+    return 'rsc'
+  }
+
+  if (contentType.includes('json')) {
+    return 'json'
+  }
+
+  return 'html'
+}
+
 function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   // Home page in stored under `index` path
   const pageKey = request.uri.replace('/', '') || 'index'
-  const isJSON = request.headers['content-type']?.[0]?.value?.includes('json')
+  const fileExtension = getFileExtensionTypeFromRequest(request)
 
   const cacheKey = [
     pageKey,
@@ -120,8 +135,7 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const md5CacheKey = crypto.createHash('md5').update(cacheKey).digest('hex')
 
   return {
-    s3Key: `${pageKey}/${md5CacheKey}.${isJSON ? 'json' : 'html'}`,
-    contentType: isJSON ? 'application/json' : 'text/html',
+    s3Key: `${pageKey}/${md5CacheKey}.${fileExtension}`,
     cacheKey,
     md5CacheKey
   }
