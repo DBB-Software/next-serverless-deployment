@@ -8,7 +8,7 @@ import path from 'node:path'
 import { buildLambda } from '../../build/edge'
 import { CacheConfig } from '../../types'
 
-interface RoutingLambdaEdgeProps extends cdk.StackProps {
+interface CheckExpirationLambdaEdgeProps extends cdk.StackProps {
   bucketName: string
   ebAppDomain: string
   buildOutputPath: string
@@ -22,15 +22,15 @@ const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
   '20': lambda.Runtime.NODEJS_20_X
 }
 
-export class RoutingLambdaEdge extends Construct {
+export class CheckExpirationLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
-  constructor(scope: Construct, id: string, props: RoutingLambdaEdgeProps) {
+  constructor(scope: Construct, id: string, props: CheckExpirationLambdaEdgeProps) {
     const { bucketName, bucketRegion, ebAppDomain, nodejs, buildOutputPath, cacheConfig } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
-    const name = 'edgeRouting'
+    const name = 'checkExpiration'
 
     buildLambda(name, buildOutputPath, {
       define: {
@@ -41,13 +41,13 @@ export class RoutingLambdaEdge extends Construct {
       }
     })
 
-    const logGroup = new logs.LogGroup(this, 'RoutingLambdaEdgeLogGroup', {
-      logGroupName: `/aws/lambda/${id}-edgeRouting`,
+    const logGroup = new logs.LogGroup(this, 'CheckExpirationLambdaEdgeLogGroup', {
+      logGroupName: `/aws/lambda/${id}-checkExpiration`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.ONE_DAY
     })
 
-    this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'RoutingLambdaEdge', {
+    this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'CheckExpirationLambdaEdge', {
       runtime: nodeJSEnvironment,
       code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', name)),
       handler: 'index.handler',

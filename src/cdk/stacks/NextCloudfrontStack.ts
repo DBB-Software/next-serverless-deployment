@@ -4,6 +4,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3'
 import { RoutingLambdaEdge } from '../constructs/RoutingLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { CacheConfig } from '../../types'
+import { CheckExpirationLambdaEdge } from '../constructs/CheckExpirationLambdaEdge'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -16,6 +17,7 @@ export interface NextCloudfrontStackProps extends StackProps {
 
 export class NextCloudfrontStack extends Stack {
   public readonly routingLambdaEdge: RoutingLambdaEdge
+  public readonly checkExpLambdaEdge: CheckExpirationLambdaEdge
   public readonly cloudfront: CloudFrontDistribution
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
@@ -23,6 +25,15 @@ export class NextCloudfrontStack extends Stack {
     const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region, cacheConfig } = props
 
     this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
+      nodejs,
+      bucketName: staticBucketName,
+      ebAppDomain,
+      buildOutputPath,
+      cacheConfig,
+      bucketRegion: region
+    })
+
+    this.checkExpLambdaEdge = new CheckExpirationLambdaEdge(this, `${id}-CheckExpirationLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
       ebAppDomain,
@@ -39,10 +50,12 @@ export class NextCloudfrontStack extends Stack {
     this.cloudfront = new CloudFrontDistribution(this, `${id}-NextCloudFront`, {
       staticBucket,
       ebAppDomain,
-      edgeFunction: this.routingLambdaEdge.lambdaEdge,
+      requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
+      responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
       cacheConfig
     })
 
     staticBucket.grantRead(this.routingLambdaEdge.lambdaEdge)
+    staticBucket.grantRead(this.checkExpLambdaEdge.lambdaEdge)
   }
 }

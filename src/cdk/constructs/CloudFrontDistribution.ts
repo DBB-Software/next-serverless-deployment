@@ -10,7 +10,8 @@ import { HEADER_DEVICE_TYPE } from '../../constants'
 interface CloudFrontPropsDistribution {
   staticBucket: s3.IBucket
   ebAppDomain: string
-  edgeFunction: cloudfront.experimental.EdgeFunction
+  requestEdgeFunction: cloudfront.experimental.EdgeFunction
+  responseEdgeFunction: cloudfront.experimental.EdgeFunction
   cacheConfig: CacheConfig
 }
 
@@ -23,7 +24,7 @@ export class CloudFrontDistribution extends Construct {
   constructor(scope: Construct, id: string, props: CloudFrontPropsDistribution) {
     super(scope, id)
 
-    const { staticBucket, edgeFunction, cacheConfig } = props
+    const { staticBucket, requestEdgeFunction, responseEdgeFunction, cacheConfig } = props
 
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
       cachePolicyName: `${id}-SplitCachePolicy`,
@@ -55,8 +56,12 @@ export class CloudFrontDistribution extends Construct {
         origin: s3Origin,
         edgeLambdas: [
           {
-            functionVersion: edgeFunction.currentVersion,
+            functionVersion: requestEdgeFunction.currentVersion,
             eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
+          },
+          {
+            functionVersion: responseEdgeFunction.currentVersion,
+            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE
           }
         ],
         cachePolicy: splitCachePolicy
