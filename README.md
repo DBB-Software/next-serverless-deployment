@@ -41,6 +41,30 @@ Then to deploy NextJS app run the following command:
 ```
 This command is going to create all necessary AWS resources (if they do not exist yet), bundle NextJS application and upload all assets to AWS.
 
+### Cache config
+Create `next-serverless.config.js` file in the root of your app. Config files allows you to specify cache behaviour of your application.
+
+Default config:
+
+```
+/**
+ * @type {import('next-serverless-deployment').CacheConfig}
+ */
+const config = {
+  noCacheRoutes: [],
+  cacheCookies: [],
+  cacheQueries: [],
+  enableDeviceSplit: false
+}
+
+module.exports = config
+```
+
+- noCacheRoutes: specify list of routes which are going to be ignored to be cached.
+- cacheCookies: list of cookie names for cache fragmentation.
+- cacheQueries: list of query names for cache fragmentation.
+- enableDeviceSplit: flag to control cache fragmentation based on device type (desktop vs tablet vs mobile).
+
 ## CLI
 
 ### bootstrap
