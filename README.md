@@ -41,6 +41,30 @@ Then to deploy NextJS app run the following command:
 ```
 This command is going to create all necessary AWS resources (if they do not exist yet), bundle NextJS application and upload all assets to AWS.
 
+### Cache config
+Create `next-serverless.config.js` file in the root of your app. Config files allows you to specify cache behaviour of your application.
+
+Default config:
+
+```
+/**
+ * @type {import('next-serverless-deployment').CacheConfig}
+ */
+const config = {
+  noCacheRoutes: [],
+  cacheCookies: [],
+  cacheQueries: [],
+  enableDeviceSplit: false
+}
+
+module.exports = config
+```
+
+- noCacheRoutes: specify list of routes which are going to be ignored to be cached.
+- cacheCookies: list of cookie names for cache fragmentation.
+- cacheQueries: list of query names for cache fragmentation.
+- enableDeviceSplit: flag to control cache fragmentation based on device type (desktop vs tablet vs mobile).
+
 ## CLI
 
 ### bootstrap
@@ -74,6 +98,7 @@ sequenceDiagram
     participant User
     participant CloudFront
     participant Request Origin Lambda@Edge
+    participant Response Origin Lambda@Edge
     participant S3Bucket
     participant ElasticBeanstalk with Load Balancer
 
@@ -84,7 +109,13 @@ sequenceDiagram
     Request Origin Lambda@Edge ->> S3Bucket: Sends Head request to check if file exists in S3
     alt File exists in S3
       Request Origin Lambda@Edge ->> S3Bucket: Forwarding request to S3 origin
-      S3Bucket ->> CloudFront: returns cached file
+      S3Bucket ->> Response Origin Lambda@Edge: lambda edge listener
+      Response Origin Lambda@Edge ->> CloudFront: returns result from s3 origin
+        alt File is expired in S3
+          Response Origin Lambda@Edge ->> CloudFront: sets cache header to no-cache to avoid caching of stale data
+        else
+          Response Origin Lambda@Edge ->> CloudFront: forwards request from S3 origin
+        end
     else File does not exit
       Request Origin Lambda@Edge ->> ElasticBeanstalk with Load Balancer: Sends request to render page when it does not exist in S3
       ElasticBeanstalk with Load Balancer ->> CloudFront: returns generated page
