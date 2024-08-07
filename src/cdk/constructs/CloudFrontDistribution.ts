@@ -17,7 +17,8 @@ interface CloudFrontPropsDistribution {
 
 const OneMonthCache = Duration.days(30)
 const NoCache = Duration.seconds(0)
-
+const defaultNextQueries = ['_rsc']
+const defaultNextHeaders = ['Cache-Control']
 export class CloudFrontDistribution extends Construct {
   public readonly cf: cloudfront.Distribution
 
@@ -28,13 +29,16 @@ export class CloudFrontDistribution extends Construct {
 
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
       cachePolicyName: `${id}-SplitCachePolicy`,
-      queryStringBehavior: cacheConfig.cacheQueries?.length
-        ? cloudfront.CacheQueryStringBehavior.allowList(...cacheConfig.cacheQueries)
-        : cloudfront.CacheQueryStringBehavior.none(),
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList(
+        ...defaultNextQueries.concat(cacheConfig.cacheQueries ?? [])
+      ),
       cookieBehavior: cacheConfig.cacheCookies?.length
         ? cloudfront.CacheCookieBehavior.allowList(...cacheConfig.cacheCookies)
         : cloudfront.CacheCookieBehavior.none(),
-      headerBehavior: cloudfront.CacheHeaderBehavior.allowList('Cache-Control', ...Object.values(HEADER_DEVICE_TYPE)),
+      headerBehavior: cloudfront.CacheHeaderBehavior.allowList(
+        ...defaultNextHeaders,
+        ...Object.values(HEADER_DEVICE_TYPE)
+      ),
       minTtl: NoCache,
       defaultTtl: NoCache // no caching by default, cache value is going to be used from Cache-Control header.
     })
@@ -68,6 +72,16 @@ export class CloudFrontDistribution extends Construct {
       },
       defaultRootObject: '',
       additionalBehaviors: {
+        ['/_next/data/*']: {
+          origin: s3Origin,
+          edgeLambdas: [
+            {
+              functionVersion: requestEdgeFunction.currentVersion,
+              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
+            }
+          ],
+          cachePolicy: splitCachePolicy
+        },
         '/_next/*': {
           origin: s3Origin,
           cachePolicy: longCachePolicy

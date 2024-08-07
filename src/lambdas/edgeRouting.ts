@@ -104,10 +104,41 @@ function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | undefined)
   return null
 }
 
+function getFileExtensionTypeFromRequest(request: CloudFrontRequest) {
+  const contentType = request.headers['content-type']?.[0]?.value ?? ''
+  const isRSC = request.querystring.includes('_rsc')
+
+  if (isRSC) {
+    return 'rsc'
+  }
+
+  if (contentType.includes('json') || request.uri.endsWith('.json')) {
+    return 'json'
+  }
+
+  return 'html'
+}
+
+function getPageKeyFromRequest(request: CloudFrontRequest) {
+  const key = request.uri.replace('/', '')
+
+  // Home page in stored under `index` path
+  if (!key) {
+    return 'index'
+  }
+
+  // NextJS page router page data when do soft navigation.
+  if (key.match('_next/data')) {
+    return key.split(/_next\/data\/[a-zA-z0-9]+\//)[1].replace('.json', '')
+  }
+
+  return key
+}
+
 function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   // Home page in stored under `index` path
-  const pageKey = request.uri.replace('/', '') || 'index'
-  const isJSON = request.headers['content-type']?.[0]?.value?.includes('json')
+  const pageKey = getPageKeyFromRequest(request)
+  const fileExtension = getFileExtensionTypeFromRequest(request)
 
   const cacheKey = [
     pageKey,
@@ -120,8 +151,7 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const md5CacheKey = crypto.createHash('md5').update(cacheKey).digest('hex')
 
   return {
-    s3Key: `${pageKey}/${md5CacheKey}.${isJSON ? 'json' : 'html'}`,
-    contentType: isJSON ? 'application/json' : 'text/html',
+    s3Key: `${pageKey}/${md5CacheKey}.${fileExtension}`,
     cacheKey,
     md5CacheKey
   }
