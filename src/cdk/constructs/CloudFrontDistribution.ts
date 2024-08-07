@@ -72,6 +72,16 @@ export class CloudFrontDistribution extends Construct {
       },
       defaultRootObject: '',
       additionalBehaviors: {
+        ['/_next/data/*']: {
+          origin: s3Origin,
+          edgeLambdas: [
+            {
+              functionVersion: requestEdgeFunction.currentVersion,
+              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
+            }
+          ],
+          cachePolicy: splitCachePolicy
+        },
         '/_next/*': {
           origin: s3Origin,
           cachePolicy: longCachePolicy

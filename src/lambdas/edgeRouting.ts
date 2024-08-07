@@ -112,16 +112,32 @@ function getFileExtensionTypeFromRequest(request: CloudFrontRequest) {
     return 'rsc'
   }
 
-  if (contentType.includes('json')) {
+  if (contentType.includes('json') || request.uri.endsWith('.json')) {
     return 'json'
   }
 
   return 'html'
 }
 
+function getPageKeyFromRequest(request: CloudFrontRequest) {
+  const key = request.uri.replace('/', '')
+
+  // Home page in stored under `index` path
+  if (!key) {
+    return 'index'
+  }
+
+  // NextJS page router page data when do soft navigation.
+  if (key.match('_next/data')) {
+    return key.split(/_next\/data\/[a-zA-z0-9]+\//)[1].replace('.json', '')
+  }
+
+  return key
+}
+
 function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   // Home page in stored under `index` path
-  const pageKey = request.uri.replace('/', '') || 'index'
+  const pageKey = getPageKeyFromRequest(request)
   const fileExtension = getFileExtensionTypeFromRequest(request)
 
   const cacheKey = [
