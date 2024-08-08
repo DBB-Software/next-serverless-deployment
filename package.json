@@ -14,6 +14,12 @@
     "dist",
     "README.md"
   ],
+  "keywords": [
+    "NextJS",
+    "cache",
+    "aws",
+    "deployment"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
