@@ -1,0 +1,23 @@
+name: Install dependencies
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: '.tool-versions'
+        cache: 'npm'
+
+    - name: Cache node_modules
+      id: cache-deps
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-node_modules-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node_modules-${{ hashFiles('package-lock.json') }}
+
+    - name: Install Packages
+      run: npm install
+      shell: bash
