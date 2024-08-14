@@ -90,5 +90,7 @@ export class CloudFrontDistribution extends Construct {
     })
 
     addOutput(this, `${id}-CloudfrontDistributionId`, this.cf.distributionId)
+    addOutput(this, `${id}-SplitCachePolicyId`, splitCachePolicy.cachePolicyId)
+    addOutput(this, `${id}-LongCachePolicyId`, splitCachePolicy.cachePolicyId)
   }
 }

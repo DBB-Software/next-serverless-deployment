@@ -7,6 +7,7 @@ import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
 import { buildLambda } from '../../build/edge'
 import { CacheConfig } from '../../types'
+import { addOutput } from '../../common/cdk'
 
 interface CheckExpirationLambdaEdgeProps extends cdk.StackProps {
   bucketName: string
@@ -62,5 +63,6 @@ export class CheckExpirationLambdaEdge extends Construct {
     })
 
     this.lambdaEdge.addToRolePolicy(policyStatement)
+    addOutput(this, `${id}-CheckExpirationFunctionArn`, this.lambdaEdge.functionArn)
   }
 }

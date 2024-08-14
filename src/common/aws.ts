@@ -6,6 +6,13 @@ import * as AWS from 'aws-sdk'
 import { partition } from '@aws-sdk/util-endpoints'
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  CloudFront,
+  UpdateDistributionCommand,
+  GetDistributionCommand,
+  CacheBehavior
+} from '@aws-sdk/client-cloudfront'
+import { LambdaEdgeEventType } from 'aws-cdk-lib/aws-cloudfront'
 
 type GetAWSBasicProps =
   | {
@@ -152,4 +159,136 @@ export const getCDKAssetsPublisher = (
   { region, profile }: { region?: string; profile?: string }
 ) => {
   return new AssetPublishing(AssetManifest.fromFile(manifestPath), { aws: new AWSClient(region, profile) })
+}
+
+export const getCloudFrontDistribution = async (cfClient: CloudFront, distributionId: string) => {
+  const command = new GetDistributionCommand({ Id: distributionId })
+  const response = await cfClient.send(command)
+  return response
+}
+
+export const updateDistribution = async (
+  cfClient: CloudFront,
+  distributionId: string,
+  config: {
+    staticBucketName?: string
+    longCachePolicyId?: string
+    splitCachePolicyId?: string
+    routingFunctionArn?: string
+    checkExpirationFunctionArn?: string
+    addAdditionalBehaviour?: boolean
+  }
+) => {
+  const {
+    staticBucketName,
+    routingFunctionArn,
+    splitCachePolicyId,
+    addAdditionalBehaviour,
+    longCachePolicyId,
+    checkExpirationFunctionArn
+  } = config
+  const { Distribution, ETag } = await getCloudFrontDistribution(cfClient, distributionId)
+  if (Distribution && Distribution.DistributionConfig) {
+    if (staticBucketName && Distribution.DistributionConfig.Origins && Distribution.DistributionConfig.Origins.Items) {
+      const updatedOrigins = Distribution.DistributionConfig.Origins.Items?.map((origin) => {
+        if (origin.Id === Distribution.DistributionConfig?.DefaultCacheBehavior?.TargetOriginId) {
+          return {
+            ...origin,
+            DomainName: staticBucketName,
+            CustomOriginConfig: undefined // Remove any custom origin settings
+          }
+        }
+        return origin
+      })
+
+      // Update the Origins with the modified origin
+      Distribution.DistributionConfig.Origins.Items = updatedOrigins
+    }
+
+    if (addAdditionalBehaviour) {
+      const behaviours: CacheBehavior[] = [
+        {
+          PathPattern: '/_next/data/*',
+          TargetOriginId: undefined,
+          ViewerProtocolPolicy: 'allow-all',
+          LambdaFunctionAssociations: {
+            Quantity: 1,
+            Items: [
+              {
+                EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+                LambdaFunctionARN: routingFunctionArn
+              }
+            ]
+          },
+          CachePolicyId: splitCachePolicyId
+        },
+        {
+          PathPattern: '/_next/*',
+          TargetOriginId: undefined,
+          ViewerProtocolPolicy: 'allow-all',
+          LambdaFunctionAssociations: {
+            Quantity: 1,
+            Items: [
+              {
+                EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+                LambdaFunctionARN: routingFunctionArn
+              }
+            ]
+          },
+          CachePolicyId: longCachePolicyId
+        }
+      ]
+      const updatedBehaviors = behaviours.map((behaviour) => {
+        const oldBehavior = (Distribution.DistributionConfig?.CacheBehaviors?.Items || []).find(
+          (b) => b.PathPattern === behaviour.PathPattern
+        )
+        if (oldBehavior) {
+          return {
+            ...oldBehavior,
+            ...behaviour
+          }
+        }
+        return behaviour
+      })
+
+      const mergedBehaviours = (Distribution.DistributionConfig?.CacheBehaviors?.Items || [])
+        .filter((a) => !updatedBehaviors.find((b) => a.PathPattern === b.PathPattern))
+        .concat(updatedBehaviors)
+
+      Distribution.DistributionConfig.CacheBehaviors = {
+        Items: mergedBehaviours,
+        Quantity: mergedBehaviours.length
+      }
+    }
+
+    Distribution.DistributionConfig.DefaultCacheBehavior = {
+      LambdaFunctionAssociations: {
+        Quantity: 2,
+        Items: [
+          {
+            EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+            LambdaFunctionARN: routingFunctionArn
+          },
+          {
+            EventType: LambdaEdgeEventType.ORIGIN_RESPONSE,
+            LambdaFunctionARN: checkExpirationFunctionArn
+          }
+        ]
+      },
+      TargetOriginId: undefined,
+      ViewerProtocolPolicy: 'allow-all'
+    }
+  }
+
+  // Update the distribution with the modified config
+  const updateParams = {
+    Id: distributionId,
+    IfMatch: ETag, // Required for updating the distribution
+    DistributionConfig: Distribution?.DistributionConfig
+  }
+  const command = new UpdateDistributionCommand(updateParams)
+  const updateResponse = await cfClient.send(command)
+
+  console.log('Distribution updated successfully:', updateResponse)
+  return updateResponse
 }
