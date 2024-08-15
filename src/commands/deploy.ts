@@ -7,7 +7,7 @@ import path from 'node:path'
 import { buildApp, OUTPUT_FOLDER } from '../build/next'
 import { NextRenderServerStack, type NextRenderServerStackProps } from '../cdk/stacks/NextRenderServerStack'
 import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stacks/NextCloudfrontStack'
-import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION } from '../common/aws'
+import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION, emptyBucket } from '../common/aws'
 import { AppStack } from '../common/cdk'
 import { getProjectSettings } from '../common/project'
 import loadConfig from './helpers/loadConfig'
@@ -15,7 +15,6 @@ import loadConfig from './helpers/loadConfig'
 export interface DeployConfig {
   siteName: string
   stage?: string
-  pruneBeforeDeploy?: boolean
   nodejs?: string
   isProduction?: boolean
   aws: {
@@ -27,7 +26,6 @@ export interface DeployConfig {
 export interface DeployStackProps {
   region?: string
   profile?: string
-  pruneBeforeDeploy?: boolean
   buildOutputPath: string
   credentials: {
     accessKeyId: string
@@ -55,7 +53,7 @@ const createOutputFolder = () => {
 export const deploy = async (config: DeployConfig) => {
   let cleanNextApp
   try {
-    const { pruneBeforeDeploy = false, siteName, stage = 'development', aws } = config
+    const { siteName, stage = 'development', aws } = config
     const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
     const region = aws.region || process.env.REGION
 
@@ -104,7 +102,6 @@ export const deploy = async (config: DeployConfig) => {
       NextRenderServerStack,
       {
         ...clientAWSCredentials,
-        pruneBeforeDeploy,
         buildOutputPath: outputPath,
         profile: config.aws.profile,
         stage,
@@ -125,7 +122,6 @@ export const deploy = async (config: DeployConfig) => {
       NextCloudfrontStack,
       {
         ...clientAWSCredentials,
-        pruneBeforeDeploy,
         profile: config.aws.profile,
         nodejs: config.nodejs,
         staticBucketName: nextRenderServerStackOutput.StaticBucketName,
@@ -161,6 +157,9 @@ export const deploy = async (config: DeployConfig) => {
     childProcess.execSync(`cd ${path.join(outputPath, 'server')} && zip -r ../${archivedFolderName} \\.* *`, {
       stdio: 'inherit'
     })
+
+    // prune static bucket before upload
+    await emptyBucket(s3Client, nextRenderServerStackOutput.StaticBucketName)
 
     await uploadFolderToS3(s3Client, {
       Bucket: nextRenderServerStackOutput.StaticBucketName,

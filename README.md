@@ -82,8 +82,7 @@ Creates AWS resources for NextJS application if they were not created. Bundles N
 | Parameter Name    | Type    | Default value | Description                                                                                                                                                       |
 |-------------------|---------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | siteName          | string  | none          | Name which is going to be used for creating AWS resources                                                                                                         |
-| stage             | string  | none          | Adds prefix for AWS recource's names                                                                                                               |
-| pruneBeforeDeploy | boolean | false         | Clears all site data and resources before deployment                                                                                                      |
+| stage             | string  | none          | Adds prefix for AWS recource's names                          |
 | region            | string  | none          | AWS region. If parameter is empty going to read process.env.AWS_REGION                                                                                            |
 | profile           | string  | none          | AWS profile to use for credentials. If parameter is empty going to read credentials from:<br>process.env.AWS_ACCESS_KEY_ID and process.env.AWS_SECRET_ACCESS_KEY |
 | nodejs            | string  | 20            | Supports nodejs v18 and v20                                                                                                                                       |
