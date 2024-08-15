@@ -10,7 +10,8 @@ import {
   CloudFront,
   UpdateDistributionCommand,
   GetDistributionCommand,
-  CacheBehavior
+  CacheBehavior,
+  GetDistributionCommandOutput
 } from '@aws-sdk/client-cloudfront'
 import { LambdaEdgeEventType } from 'aws-cdk-lib/aws-cloudfront'
 
@@ -161,6 +162,47 @@ export const getCDKAssetsPublisher = (
   return new AssetPublishing(AssetManifest.fromFile(manifestPath), { aws: new AWSClient(region, profile) })
 }
 
+const behaviorMapper = (config: {
+  targetOriginId?: string
+  functionArn?: string
+  cachePolicyId: string
+  pathPattern?: string
+}): CacheBehavior => {
+  const { pathPattern, targetOriginId, functionArn, cachePolicyId } = config
+
+  return {
+    PathPattern: pathPattern,
+    TargetOriginId: targetOriginId,
+    ViewerProtocolPolicy: 'allow-all',
+    LambdaFunctionAssociations: functionArn
+      ? {
+          Quantity: 1,
+          Items: [
+            {
+              EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+              LambdaFunctionARN: functionArn
+            }
+          ]
+        }
+      : {
+          Quantity: 0,
+          Items: []
+        },
+    CachePolicyId: cachePolicyId,
+    SmoothStreaming: false,
+    Compress: true,
+    FieldLevelEncryptionId: '',
+    AllowedMethods: {
+      Quantity: 2,
+      Items: ['GET', 'HEAD'],
+      CachedMethods: {
+        Quantity: 2,
+        Items: ['GET', 'HEAD']
+      }
+    }
+  }
+}
+
 export const getCloudFrontDistribution = async (cfClient: CloudFront, distributionId: string) => {
   const command = new GetDistributionCommand({ Id: distributionId })
   const response = await cfClient.send(command)
@@ -169,7 +211,7 @@ export const getCloudFrontDistribution = async (cfClient: CloudFront, distributi
 
 export const updateDistribution = async (
   cfClient: CloudFront,
-  distributionId: string,
+  distribution: GetDistributionCommandOutput,
   config: {
     staticBucketName?: string
     longCachePolicyId?: string
@@ -187,11 +229,12 @@ export const updateDistribution = async (
     longCachePolicyId,
     checkExpirationFunctionArn
   } = config
-  const { Distribution, ETag } = await getCloudFrontDistribution(cfClient, distributionId)
+  const { Distribution, ETag } = distribution
   if (Distribution && Distribution.DistributionConfig) {
+    const targetOriginId = Distribution.DistributionConfig?.DefaultCacheBehavior?.TargetOriginId
     if (staticBucketName && Distribution.DistributionConfig.Origins && Distribution.DistributionConfig.Origins.Items) {
       const updatedOrigins = Distribution.DistributionConfig.Origins.Items?.map((origin) => {
-        if (origin.Id === Distribution.DistributionConfig?.DefaultCacheBehavior?.TargetOriginId) {
+        if (origin.Id === targetOriginId) {
           return {
             ...origin,
             DomainName: staticBucketName,
@@ -207,36 +250,17 @@ export const updateDistribution = async (
 
     if (addAdditionalBehaviour) {
       const behaviours: CacheBehavior[] = [
-        {
-          PathPattern: '/_next/data/*',
-          TargetOriginId: undefined,
-          ViewerProtocolPolicy: 'allow-all',
-          LambdaFunctionAssociations: {
-            Quantity: 1,
-            Items: [
-              {
-                EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
-                LambdaFunctionARN: routingFunctionArn
-              }
-            ]
-          },
-          CachePolicyId: splitCachePolicyId
-        },
-        {
-          PathPattern: '/_next/*',
-          TargetOriginId: undefined,
-          ViewerProtocolPolicy: 'allow-all',
-          LambdaFunctionAssociations: {
-            Quantity: 1,
-            Items: [
-              {
-                EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
-                LambdaFunctionARN: routingFunctionArn
-              }
-            ]
-          },
-          CachePolicyId: longCachePolicyId
-        }
+        behaviorMapper({
+          pathPattern: '/_next/data/*',
+          targetOriginId,
+          cachePolicyId: splitCachePolicyId!,
+          functionArn: routingFunctionArn
+        }),
+        behaviorMapper({
+          pathPattern: '/_next/*',
+          targetOriginId,
+          cachePolicyId: longCachePolicyId!
+        })
       ]
       const updatedBehaviors = behaviours.map((behaviour) => {
         const oldBehavior = (Distribution.DistributionConfig?.CacheBehaviors?.Items || []).find(
@@ -261,7 +285,10 @@ export const updateDistribution = async (
       }
     }
 
+    const defBeh = Distribution.DistributionConfig.DefaultCacheBehavior
+
     Distribution.DistributionConfig.DefaultCacheBehavior = {
+      ...defBeh,
       LambdaFunctionAssociations: {
         Quantity: 2,
         Items: [
@@ -275,20 +302,22 @@ export const updateDistribution = async (
           }
         ]
       },
-      TargetOriginId: undefined,
-      ViewerProtocolPolicy: 'allow-all'
+      TargetOriginId: targetOriginId,
+      ViewerProtocolPolicy: 'allow-all',
+      SmoothStreaming: false,
+      Compress: true,
+      CachePolicyId: splitCachePolicyId
     }
   }
 
   // Update the distribution with the modified config
   const updateParams = {
-    Id: distributionId,
+    Id: Distribution?.Id,
     IfMatch: ETag, // Required for updating the distribution
     DistributionConfig: Distribution?.DistributionConfig
   }
   const command = new UpdateDistributionCommand(updateParams)
   const updateResponse = await cfClient.send(command)
 
-  console.log('Distribution updated successfully:', updateResponse)
   return updateResponse
 }
