@@ -12,6 +12,7 @@ interface CLIOptions {
   profile?: string
   nodejs?: string
   production?: boolean
+  cloudFrontId?: string
 }
 
 const cli = yargs(hideBin(process.argv))
@@ -46,6 +47,10 @@ const cli = yargs(hideBin(process.argv))
     description: 'Creates production stack.',
     default: false
   })
+  .option('cloudFrontId', {
+    type: 'string',
+    describe: 'Existing cloudfront Id.'
+  })
 
 cli.command<CLIOptions>(
   'bootstrap',
@@ -62,7 +67,7 @@ cli.command<CLIOptions>(
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs, production } = argv
+    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs, production, cloudFrontId } = argv
 
     await deploy({
       siteName,
@@ -70,6 +75,7 @@ cli.command<CLIOptions>(
       pruneBeforeDeploy,
       nodejs,
       isProduction: production,
+      cloudFrontId,
       aws: {
         region,
         profile
