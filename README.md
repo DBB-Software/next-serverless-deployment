@@ -88,6 +88,7 @@ Creates AWS resources for NextJS application if they were not created. Bundles N
 | profile           | string  | none          | AWS profile to use for credentials. If parameter is empty going to read credentials from:<br>process.env.AWS_ACCESS_KEY_ID and process.env.AWS_SECRET_ACCESS_KEY |
 | nodejs            | string  | 20            | Supports nodejs v18 and v20                                                                                                                                       |
 | production        | boolean | false         | Identifies if you want to create production AWS resources. So they are going to have different delete policies to keep data in safe.                              |
+| cloudFrontId      | string  | none          | Existing cloud front distribution id. Useful for when new cloudfront distribution isn't needed                                                                  |
 
 ## Architecture
 
