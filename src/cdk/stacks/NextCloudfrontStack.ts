@@ -1,6 +1,7 @@
 import { Stack, type StackProps } from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
+import * as cloudfront from '@aws-sdk/client-cloudfront'
 import { RoutingLambdaEdge } from '../constructs/RoutingLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { CacheConfig } from '../../types'
@@ -13,6 +14,7 @@ export interface NextCloudfrontStackProps extends StackProps {
   ebAppDomain: string
   buildOutputPath: string
   cacheConfig: CacheConfig
+  customCloudFrontDistribution?: cloudfront.Distribution
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -22,7 +24,15 @@ export class NextCloudfrontStack extends Stack {
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
     super(scope, id, props)
-    const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region, cacheConfig } = props
+    const {
+      nodejs,
+      buildOutputPath,
+      staticBucketName,
+      ebAppDomain,
+      region,
+      cacheConfig,
+      customCloudFrontDistribution
+    } = props
 
     this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
       nodejs,
@@ -52,7 +62,9 @@ export class NextCloudfrontStack extends Stack {
       ebAppDomain,
       requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
       responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
-      cacheConfig
+      cacheConfig,
+      customCloudFrontId: customCloudFrontDistribution?.Id,
+      customCloudFrontDomainName: customCloudFrontDistribution?.DomainName
     })
 
     staticBucket.grantRead(this.routingLambdaEdge.lambdaEdge)

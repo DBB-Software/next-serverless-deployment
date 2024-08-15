@@ -13,6 +13,8 @@ interface CloudFrontPropsDistribution {
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
   responseEdgeFunction: cloudfront.experimental.EdgeFunction
   cacheConfig: CacheConfig
+  customCloudFrontId?: string
+  customCloudFrontDomainName?: string
 }
 
 const OneMonthCache = Duration.days(30)
@@ -20,12 +22,19 @@ const NoCache = Duration.seconds(0)
 const defaultNextQueries = ['_rsc']
 const defaultNextHeaders = ['Cache-Control']
 export class CloudFrontDistribution extends Construct {
-  public readonly cf: cloudfront.Distribution
+  public readonly cf: cloudfront.IDistribution
 
   constructor(scope: Construct, id: string, props: CloudFrontPropsDistribution) {
     super(scope, id)
 
-    const { staticBucket, requestEdgeFunction, responseEdgeFunction, cacheConfig } = props
+    const {
+      staticBucket,
+      requestEdgeFunction,
+      responseEdgeFunction,
+      cacheConfig,
+      customCloudFrontId,
+      customCloudFrontDomainName
+    } = props
 
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
       cachePolicyName: `${id}-SplitCachePolicy`,
@@ -55,42 +64,50 @@ export class CloudFrontDistribution extends Construct {
 
     const s3Origin = new origins.S3Origin(staticBucket)
 
-    this.cf = new cloudfront.Distribution(this, id, {
-      defaultBehavior: {
-        origin: s3Origin,
-        edgeLambdas: [
-          {
-            functionVersion: requestEdgeFunction.currentVersion,
-            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
-          },
-          {
-            functionVersion: responseEdgeFunction.currentVersion,
-            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE
-          }
-        ],
-        cachePolicy: splitCachePolicy
-      },
-      defaultRootObject: '',
-      additionalBehaviors: {
-        ['/_next/data/*']: {
+    if (customCloudFrontId && customCloudFrontDomainName) {
+      this.cf = cloudfront.Distribution.fromDistributionAttributes(this, id, {
+        domainName: customCloudFrontId,
+        distributionId: customCloudFrontId
+      })
+    } else {
+      this.cf = new cloudfront.Distribution(this, id, {
+        defaultBehavior: {
           origin: s3Origin,
           edgeLambdas: [
             {
               functionVersion: requestEdgeFunction.currentVersion,
               eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
+            },
+            {
+              functionVersion: responseEdgeFunction.currentVersion,
+              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE
             }
           ],
           cachePolicy: splitCachePolicy
         },
-        '/_next/*': {
-          origin: s3Origin,
-          cachePolicy: longCachePolicy
+        defaultRootObject: '',
+        additionalBehaviors: {
+          ['/_next/data/*']: {
+            origin: s3Origin,
+            edgeLambdas: [
+              {
+                functionVersion: requestEdgeFunction.currentVersion,
+                eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
+              }
+            ],
+            cachePolicy: splitCachePolicy
+          },
+          '/_next/*': {
+            origin: s3Origin,
+            cachePolicy: longCachePolicy
+          }
         }
-      }
-    })
+      })
+    }
 
     addOutput(this, `${id}-CloudfrontDistributionId`, this.cf.distributionId)
     addOutput(this, `${id}-SplitCachePolicyId`, splitCachePolicy.cachePolicyId)
-    addOutput(this, `${id}-LongCachePolicyId`, splitCachePolicy.cachePolicyId)
+    addOutput(this, `${id}-LongCachePolicyId`, longCachePolicy.cachePolicyId)
+    addOutput(this, `${id}-StaticBucketRegionalDomainName`, staticBucket.bucketRegionalDomainName)
   }
 }
