@@ -75,16 +75,11 @@ function transformCookiesToObject(cookies: Array<{ key?: string | undefined; val
 }
 
 function buildCacheKey(keys: string[], data: Record<string, string | string[]>, prefix: string) {
-  if (keys.length) {
-    const cacheString = keys
-      .map((key) => (data[key] ? `${key}=${data[key]}` : null))
-      .filter(Boolean)
-      .join('-')
+  if (!keys.length) return null
 
-    return cacheString ? `${prefix}(${cacheString})` : null
-  }
+  const cacheKeys = keys.reduce<string[]>((prev, curr) => (!data[curr] ? prev : [...prev, `${curr}=${data[curr]}`]), [])
 
-  return null
+  return !cacheKeys.length ? null : `${prefix}(${cacheKeys.join('-')})`
 }
 
 function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | undefined) {
@@ -141,10 +136,13 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const fileExtension = getFileExtensionTypeFromRequest(request)
 
   const cacheKey = [
-    pageKey,
     cacheConfig.enableDeviceSplit ? getCurrentDeviceType(request.headers) : null,
-    buildCacheKey(cacheConfig.cacheCookies ?? [], transformCookiesToObject(request.headers.cookie), 'cookie'),
-    buildCacheKey(cacheConfig.cacheQueries ?? [], transformQueryToObject(request.querystring), 'query')
+    buildCacheKey(
+      cacheConfig.cacheCookies?.toSorted() ?? [],
+      transformCookiesToObject(request.headers.cookie),
+      'cookie'
+    ),
+    buildCacheKey(cacheConfig.cacheQueries?.toSorted() ?? [], transformQueryToObject(request.querystring), 'query')
   ]
     .filter(Boolean)
     .join('-')
