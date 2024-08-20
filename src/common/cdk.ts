@@ -28,7 +28,6 @@ interface AppStackConstructorWithArgs<T, A> {
 }
 
 interface AppStackOptions extends cdk.StackProps {
-  pruneBeforeDeploy?: boolean
   buildOutputPath: string
   region?: string
   profile?: string
@@ -133,7 +132,7 @@ export class AppStack<T extends cdk.Stack, U> {
   }
 
   public deployStack = async (): Promise<Record<string, string>> => {
-    const { pruneBeforeDeploy, buildOutputPath, region, profile } = this.options
+    const { buildOutputPath, region, profile } = this.options
 
     const assetsPublisher = getCDKAssetsPublisher(path.join(buildOutputPath, `${this.stackName}.assets.json`), {
       region: region,
@@ -142,19 +141,14 @@ export class AppStack<T extends cdk.Stack, U> {
     await assetsPublisher.publish()
 
     const ifStackExists = await this.checkIfStackExists()
-    if (ifStackExists && pruneBeforeDeploy) {
-      await this.destroyStack()
-    }
 
-    if (!ifStackExists || (ifStackExists && pruneBeforeDeploy)) {
-      await this.createStack()
-    }
-
-    if (ifStackExists && !pruneBeforeDeploy) {
+    if (ifStackExists) {
       const currentTemplate = await this.getCurrentStackTemplate()
       if (currentTemplate !== JSON.stringify(this.stackTemplate)) {
         await this.updateStack()
       }
+    } else {
+      await this.createStack()
     }
 
     const currentStackInfo = await this.describeCurrentStack()
