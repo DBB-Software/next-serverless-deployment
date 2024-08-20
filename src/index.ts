@@ -7,7 +7,6 @@ import { bootstrap } from './commands/bootstrap'
 interface CLIOptions {
   siteName: string
   stage?: string
-  pruneBeforeDeploy?: boolean
   region?: string
   profile?: string
   nodejs?: string
@@ -17,7 +16,7 @@ interface CLIOptions {
 const cli = yargs(hideBin(process.argv))
   .scriptName('@dbbs-next')
   .usage('$0 <command> [options]')
-  .example('$0 deploy --siteName MySite --stage staging --pruneBeforeDeployment', 'Deploy the app.')
+  .example('$0 deploy --siteName MySite --stage staging', 'Deploy the app.')
   .option('siteName', {
     type: 'string',
     requiresArg: true,
@@ -26,11 +25,6 @@ const cli = yargs(hideBin(process.argv))
   .option('stage', {
     type: 'string',
     describe: 'The stage of the app, defaults to production'
-  })
-  .option('pruneBeforeDeploy', {
-    type: 'boolean',
-    description: 'Clear CDK stack before deployment.',
-    default: false
   })
   .option('region', {
     type: 'string'
@@ -62,12 +56,11 @@ cli.command<CLIOptions>(
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, pruneBeforeDeploy, stage, region, profile, nodejs, production } = argv
+    const { siteName, stage, region, profile, nodejs, production } = argv
 
     await deploy({
       siteName,
       stage,
-      pruneBeforeDeploy,
       nodejs,
       isProduction: production,
       aws: {
