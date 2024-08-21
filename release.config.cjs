@@ -2,7 +2,7 @@
  * @type {import('semantic-release').GlobalConfig}
  */
 module.exports = {
-  branches: ['main', 'feat/CI-1043-sementic-release', 'sementic-release'],
+  branches: ['main'],
   plugins: [
     [
       '@semantic-release/commit-analyzer',
