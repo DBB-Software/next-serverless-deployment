@@ -11,6 +11,6 @@ if [[ $commit_message == Merge* ]]; then
 fi
 
 if [[ ! $commit_message =~ $commit_regex ]]; then
-  echo "Commit message does not match expected format. Ex. (feat/PLATFORM-000): short description"
+  echo "Commit message does not match expected format. Ex. feat: short description"
   exit 1
 fi
