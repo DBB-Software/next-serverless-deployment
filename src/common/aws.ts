@@ -326,7 +326,8 @@ export const updateDistribution = async (
     splitCachePolicyId,
     addAdditionalBehaviour,
     longCachePolicyId,
-    checkExpirationFunctionArn
+    checkExpirationFunctionArn,
+    skipDefaultBehavior
   } = config
   const { Distribution, ETag } = distribution
 
@@ -390,28 +391,30 @@ export const updateDistribution = async (
       }
     }
 
-    const defBeh = Distribution.DistributionConfig.DefaultCacheBehavior
+    if (!skipDefaultBehavior) {
+      const defBeh = Distribution.DistributionConfig.DefaultCacheBehavior
 
-    Distribution.DistributionConfig.DefaultCacheBehavior = {
-      ...defBeh,
-      LambdaFunctionAssociations: {
-        Quantity: 2,
-        Items: [
-          {
-            EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
-            LambdaFunctionARN: routingFunctionArn
-          },
-          {
-            EventType: LambdaEdgeEventType.ORIGIN_RESPONSE,
-            LambdaFunctionARN: checkExpirationFunctionArn
-          }
-        ]
-      },
-      TargetOriginId: targetOriginId,
-      ViewerProtocolPolicy: 'allow-all',
-      SmoothStreaming: false,
-      Compress: true,
-      CachePolicyId: splitCachePolicyId
+      Distribution.DistributionConfig.DefaultCacheBehavior = {
+        ...defBeh,
+        LambdaFunctionAssociations: {
+          Quantity: 2,
+          Items: [
+            {
+              EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+              LambdaFunctionARN: routingFunctionArn
+            },
+            {
+              EventType: LambdaEdgeEventType.ORIGIN_RESPONSE,
+              LambdaFunctionARN: checkExpirationFunctionArn
+            }
+          ]
+        },
+        TargetOriginId: targetOriginId,
+        ViewerProtocolPolicy: 'allow-all',
+        SmoothStreaming: false,
+        Compress: true,
+        CachePolicyId: splitCachePolicyId
+      }
     }
   }
 

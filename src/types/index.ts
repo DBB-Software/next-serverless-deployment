@@ -12,4 +12,5 @@ export interface UpdateCloudFrontDistribution {
   routingFunctionArn?: string
   checkExpirationFunctionArn?: string
   addAdditionalBehaviour?: boolean
+  skipDefaultBehavior?: boolean
 }

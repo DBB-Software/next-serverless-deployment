@@ -30,6 +30,7 @@ export interface DeployConfig {
     profile?: string
   }
   cloudFrontId?: string
+  skipDefaultBehavior?: boolean
 }
 
 export interface DeployStackProps {
@@ -62,7 +63,7 @@ const createOutputFolder = () => {
 export const deploy = async (config: DeployConfig) => {
   let cleanNextApp
   try {
-    const { siteName, stage = 'development', aws, cloudFrontId } = config
+    const { siteName, stage = 'development', aws, cloudFrontId, skipDefaultBehavior } = config
     const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
     const region = aws.region || process.env.REGION
     let customCFDistribution: GetDistributionCommandOutput | undefined
@@ -212,7 +213,8 @@ export const deploy = async (config: DeployConfig) => {
         routingFunctionArn: nextCloudfrontStackOutput.RoutingFunctionArn!,
         checkExpirationFunctionArn: nextCloudfrontStackOutput.CheckExpirationFunctionArn!,
         staticBucketName: nextCloudfrontStackOutput.StaticBucketRegionalDomainName!,
-        addAdditionalBehaviour: true
+        addAdditionalBehaviour: true,
+        skipDefaultBehavior
       })
     }
 
