@@ -1,6 +1,6 @@
 import { fromNodeProviderChain, fromEnv, fromIni } from '@aws-sdk/credential-providers'
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts'
-import { S3, PutObjectCommandInput } from '@aws-sdk/client-s3'
+import { S3, PutObjectCommandInput, ListObjectsV2Output } from '@aws-sdk/client-s3'
 import { AssetManifest, AssetPublishing, type IAws } from 'cdk-assets'
 import * as AWS from 'aws-sdk'
 import { partition } from '@aws-sdk/util-endpoints'
@@ -20,6 +20,8 @@ type GetAWSBasicProps =
 type S3UploadFolderOptions = PutObjectCommandInput & { folderRootPath: string; Key: string }
 
 export const AWS_EDGE_REGION = 'us-east-1'
+
+export const S3_KEYS_LIMIT = 1000
 
 export const getAWSCredentials = async (props: GetAWSBasicProps) => {
   const credentials = await fromNodeProviderChain({
@@ -86,6 +88,48 @@ export const uploadFolderToS3 = async (s3Client: S3, options: S3UploadFolderOpti
         Body: fs.createReadStream(filePath)
       })
     }
+  }
+}
+
+export const listAllObjects = async (s3Client: S3, bucketName: string): Promise<ListObjectsV2Output['Contents']> => {
+  const objects = []
+  let continuationToken: string | undefined
+
+  do {
+    const { Contents: contents = [], NextContinuationToken: token } = await s3Client.listObjectsV2({
+      Bucket: bucketName,
+      ContinuationToken: continuationToken
+    })
+    objects.push(...contents)
+    continuationToken = token
+  } while (continuationToken)
+
+  return objects
+}
+
+async function deleteObjects(s3Client: S3, bucketName: string, items: ListObjectsV2Output['Contents']) {
+  if (items?.length) {
+    return s3Client.deleteObjects({
+      Bucket: bucketName,
+      Delete: {
+        Objects: items.map((item) => ({ Key: item.Key })),
+        Quiet: true
+      }
+    })
+  }
+}
+
+export const emptyBucket = async (s3Client: S3, bucketName: string) => {
+  const bucketItems = await listAllObjects(s3Client, bucketName)
+
+  if (bucketItems?.length) {
+    const deletePromises = []
+
+    for (let i = 0; i < bucketItems.length; i += S3_KEYS_LIMIT) {
+      const itemsToDelete = bucketItems.slice(i, i + S3_KEYS_LIMIT)
+      deletePromises.push(deleteObjects(s3Client, bucketName, itemsToDelete))
+    }
+    await Promise.all(deletePromises)
   }
 }
 
