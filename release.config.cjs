@@ -42,7 +42,8 @@ module.exports = {
         assets: ['dist/', 'package.json', 'CHANGELOG.md']
       }
     ],
-    '@semantic-release/github'
+    '@semantic-release/github',
+    '@semantic-release/npm'
   ],
   repositoryUrl: 'https://github.com/DBB-Software/next-serverless-deployment'
 }
