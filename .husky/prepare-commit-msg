@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+commit_message_file=$1
+COMMIT_SOURCE=$2
+echo $commit_message
+commit_message=$(cat $commit_message_file)
+commit_regex="^(bug|chore|feat):.*"
+
+if [[ $commit_message == Merge* ]]; then
+  echo "Commit source is merge. Skipping commit message validation..."
+  exit 0
+fi
+
+if [[ ! $commit_message =~ $commit_regex ]]; then
+  echo "Commit message does not match expected format. Ex. (feat/PLATFORM-000): short description"
+  exit 1
+fi
