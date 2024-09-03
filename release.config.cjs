@@ -15,7 +15,7 @@ module.exports = {
           { breaking: true, release: 'major' }
         ],
         parserOpts: {
-          headerPattern: /^\((\w+)\/([A-Z]+-\d+)\):\s(.*)$/,
+          headerPattern: /^(\w+)(?:\(([\w-]+)\))?:\s*(.*)$/,
           headerCorrespondence: ['type', 'scope', 'subject']
         }
       }
@@ -25,7 +25,7 @@ module.exports = {
       {
         preset: 'conventionalcommits',
         parserOpts: {
-          headerPattern: /^\((\w+)\/([A-Z]+-\d+)\):\s(.*)$/,
+          headerPattern: /^(\w+)(?:\(([\w-]+)\))?:\s*(.*)$/,
           headerCorrespondence: ['type', 'scope', 'subject']
         }
       }
