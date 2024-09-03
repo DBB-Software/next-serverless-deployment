@@ -59,7 +59,7 @@
     "@aws-sdk/client-sts": "3.590.0",
     "@aws-sdk/credential-providers": "3.590.0",
     "@aws-sdk/util-endpoints": "3.587.0",
-    "@dbbs/next-cache-handler-core": "1.1.2",
+    "@dbbs/next-cache-handler-core": "1.2.0",
     "@dbbs/next-cache-handler-s3": "1.1.4",
     "aws-cdk-lib": "2.144.0",
     "aws-sdk": "2.1635.0",
