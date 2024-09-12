@@ -6,6 +6,16 @@ import * as AWS from 'aws-sdk'
 import { partition } from '@aws-sdk/util-endpoints'
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  CloudFront,
+  UpdateDistributionCommand,
+  GetDistributionCommand,
+  CacheBehavior,
+  GetDistributionCommandOutput,
+  Distribution
+} from '@aws-sdk/client-cloudfront'
+import { LambdaEdgeEventType } from 'aws-cdk-lib/aws-cloudfront'
+import { UpdateCloudFrontDistribution } from '../types'
 
 type GetAWSBasicProps =
   | {
@@ -196,4 +206,226 @@ export const getCDKAssetsPublisher = (
   { region, profile }: { region?: string; profile?: string }
 ) => {
   return new AssetPublishing(AssetManifest.fromFile(manifestPath), { aws: new AWSClient(region, profile) })
+}
+
+const behaviorMapper = (config: {
+  targetOriginId?: string
+  functionArn?: string
+  cachePolicyId: string
+  pathPattern?: string
+}): CacheBehavior => {
+  const { pathPattern, targetOriginId, functionArn, cachePolicyId } = config
+
+  return {
+    PathPattern: pathPattern,
+    TargetOriginId: targetOriginId,
+    ViewerProtocolPolicy: 'allow-all',
+    LambdaFunctionAssociations: functionArn
+      ? {
+          Quantity: 1,
+          Items: [
+            {
+              EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+              LambdaFunctionARN: functionArn
+            }
+          ]
+        }
+      : {
+          Quantity: 0,
+          Items: []
+        },
+    CachePolicyId: cachePolicyId,
+    SmoothStreaming: false,
+    Compress: true,
+    FieldLevelEncryptionId: '',
+    AllowedMethods: {
+      Quantity: 2,
+      Items: ['GET', 'HEAD'],
+      CachedMethods: {
+        Quantity: 2,
+        Items: ['GET', 'HEAD']
+      }
+    }
+  }
+}
+
+export const getCloudFrontDistribution = async (cfClient: CloudFront, distributionId: string) => {
+  const command = new GetDistributionCommand({ Id: distributionId })
+  const response = await cfClient.send(command)
+  return response
+}
+
+export const shouldUpdateDistro = (config: UpdateCloudFrontDistribution, distribution?: Distribution) => {
+  const {
+    staticBucketName,
+    routingFunctionArn,
+    splitCachePolicyId,
+    addAdditionalBehaviour,
+    longCachePolicyId,
+    checkExpirationFunctionArn
+  } = config
+
+  const targetOriginId = distribution?.DistributionConfig?.DefaultCacheBehavior?.TargetOriginId
+
+  if (staticBucketName && distribution?.DistributionConfig?.Origins && distribution.DistributionConfig.Origins.Items) {
+    const mainOrigin = distribution.DistributionConfig.Origins.Items?.find((origin) => origin.Id === targetOriginId)
+
+    if (mainOrigin && mainOrigin.DomainName !== staticBucketName) {
+      return true
+    }
+  }
+
+  if (addAdditionalBehaviour) {
+    const _nextDataBehaviour = (distribution?.DistributionConfig?.CacheBehaviors?.Items || []).find(
+      (b) => b.PathPattern === '/_next/data/*'
+    )
+
+    if (
+      !_nextDataBehaviour ||
+      (_nextDataBehaviour &&
+        (_nextDataBehaviour.CachePolicyId !== splitCachePolicyId ||
+          !_nextDataBehaviour.LambdaFunctionAssociations?.Items?.find(
+            (item) => item.LambdaFunctionARN === routingFunctionArn
+          )))
+    ) {
+      return true
+    }
+
+    const _nextBehaviour = (distribution?.DistributionConfig?.CacheBehaviors?.Items || []).find(
+      (b) => b.PathPattern === '/_next/*'
+    )
+
+    if (!_nextBehaviour || _nextBehaviour.CachePolicyId !== longCachePolicyId) {
+      return true
+    }
+  }
+
+  const defBehavior = distribution?.DistributionConfig?.DefaultCacheBehavior
+  const originReqLambdaFunc = defBehavior?.LambdaFunctionAssociations?.Items?.find(
+    (item) => item.LambdaFunctionARN === routingFunctionArn
+  )
+  const originResLambdaFunc = defBehavior?.LambdaFunctionAssociations?.Items?.find(
+    (item) => item.LambdaFunctionARN === checkExpirationFunctionArn
+  )
+
+  if (defBehavior?.CachePolicyId !== splitCachePolicyId || !originResLambdaFunc || !originReqLambdaFunc) {
+    return true
+  }
+
+  return false
+}
+
+export const updateDistribution = async (
+  cfClient: CloudFront,
+  distribution: GetDistributionCommandOutput,
+  config: UpdateCloudFrontDistribution
+) => {
+  const {
+    staticBucketName,
+    routingFunctionArn,
+    splitCachePolicyId,
+    addAdditionalBehaviour,
+    longCachePolicyId,
+    checkExpirationFunctionArn,
+    skipDefaultBehavior
+  } = config
+  const { Distribution, ETag } = distribution
+
+  //shouldn't update distribution if nothing changed
+  if (!shouldUpdateDistro(config, Distribution)) {
+    return
+  }
+
+  if (Distribution && Distribution.DistributionConfig) {
+    const targetOriginId = Distribution.DistributionConfig?.DefaultCacheBehavior?.TargetOriginId
+    if (staticBucketName && Distribution.DistributionConfig.Origins && Distribution.DistributionConfig.Origins.Items) {
+      const updatedOrigins = Distribution.DistributionConfig.Origins.Items?.map((origin) => {
+        if (origin.Id === targetOriginId) {
+          return {
+            ...origin,
+            DomainName: staticBucketName,
+            CustomOriginConfig: undefined // Remove any custom origin settings
+          }
+        }
+        return origin
+      })
+
+      // Update the Origins with the modified origin
+      Distribution.DistributionConfig.Origins.Items = updatedOrigins
+    }
+
+    if (addAdditionalBehaviour) {
+      const behaviours: CacheBehavior[] = [
+        behaviorMapper({
+          pathPattern: '/_next/data/*',
+          targetOriginId,
+          cachePolicyId: splitCachePolicyId!,
+          functionArn: routingFunctionArn
+        }),
+        behaviorMapper({
+          pathPattern: '/_next/*',
+          targetOriginId,
+          cachePolicyId: longCachePolicyId!
+        })
+      ]
+      const updatedBehaviors = behaviours.map((behaviour) => {
+        const oldBehavior = (Distribution.DistributionConfig?.CacheBehaviors?.Items || []).find(
+          (b) => b.PathPattern === behaviour.PathPattern
+        )
+        if (oldBehavior) {
+          return {
+            ...oldBehavior,
+            ...behaviour
+          }
+        }
+        return behaviour
+      })
+
+      const mergedBehaviours = (Distribution.DistributionConfig?.CacheBehaviors?.Items || [])
+        .filter((a) => !updatedBehaviors.find((b) => a.PathPattern === b.PathPattern))
+        .concat(updatedBehaviors)
+
+      Distribution.DistributionConfig.CacheBehaviors = {
+        Items: mergedBehaviours,
+        Quantity: mergedBehaviours.length
+      }
+    }
+
+    if (!skipDefaultBehavior) {
+      const defBeh = Distribution.DistributionConfig.DefaultCacheBehavior
+
+      Distribution.DistributionConfig.DefaultCacheBehavior = {
+        ...defBeh,
+        LambdaFunctionAssociations: {
+          Quantity: 2,
+          Items: [
+            {
+              EventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+              LambdaFunctionARN: routingFunctionArn
+            },
+            {
+              EventType: LambdaEdgeEventType.ORIGIN_RESPONSE,
+              LambdaFunctionARN: checkExpirationFunctionArn
+            }
+          ]
+        },
+        TargetOriginId: targetOriginId,
+        ViewerProtocolPolicy: 'allow-all',
+        SmoothStreaming: false,
+        Compress: true,
+        CachePolicyId: splitCachePolicyId
+      }
+    }
+  }
+
+  // Update the distribution with the modified config
+  const updateParams = {
+    Id: Distribution?.Id,
+    IfMatch: ETag, // Required for updating the distribution
+    DistributionConfig: Distribution?.DistributionConfig
+  }
+  const command = new UpdateDistributionCommand(updateParams)
+  const updateResponse = await cfClient.send(command)
+
+  return updateResponse
 }

@@ -1,13 +1,21 @@
 import { ElasticBeanstalk } from '@aws-sdk/client-elastic-beanstalk'
 import { S3 } from '@aws-sdk/client-s3'
-import { CloudFront } from '@aws-sdk/client-cloudfront'
+import { CloudFront, GetDistributionCommandOutput } from '@aws-sdk/client-cloudfront'
 import fs from 'node:fs'
 import childProcess from 'node:child_process'
 import path from 'node:path'
 import { buildApp, OUTPUT_FOLDER } from '../build/next'
 import { NextRenderServerStack, type NextRenderServerStackProps } from '../cdk/stacks/NextRenderServerStack'
 import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stacks/NextCloudfrontStack'
-import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION, emptyBucket } from '../common/aws'
+import {
+  getAWSCredentials,
+  uploadFolderToS3,
+  uploadFileToS3,
+  AWS_EDGE_REGION,
+  emptyBucket,
+  updateDistribution,
+  getCloudFrontDistribution
+} from '../common/aws'
 import { AppStack } from '../common/cdk'
 import { getProjectSettings } from '../common/project'
 import loadConfig from './helpers/loadConfig'
@@ -21,6 +29,8 @@ export interface DeployConfig {
     region?: string
     profile?: string
   }
+  cloudFrontId?: string
+  skipDefaultBehavior?: boolean
 }
 
 export interface DeployStackProps {
@@ -53,9 +63,10 @@ const createOutputFolder = () => {
 export const deploy = async (config: DeployConfig) => {
   let cleanNextApp
   try {
-    const { siteName, stage = 'development', aws } = config
+    const { siteName, stage = 'development', aws, cloudFrontId, skipDefaultBehavior } = config
     const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
     const region = aws.region || process.env.REGION
+    let customCFDistribution: GetDistributionCommandOutput | undefined
 
     if (!credentials.accessKeyId || !credentials.secretAccessKey) {
       throw new Error('AWS Credentials are required.')
@@ -97,6 +108,10 @@ export const deploy = async (config: DeployConfig) => {
     }
     const siteNameLowerCased = siteName.toLowerCase()
 
+    if (cloudFrontId) {
+      customCFDistribution = await getCloudFrontDistribution(cloudfrontClient, cloudFrontId)
+    }
+
     const nextRenderServerStack = new AppStack<NextRenderServerStack, NextRenderServerStackProps>(
       `${siteNameLowerCased}-server`,
       NextRenderServerStack,
@@ -132,7 +147,8 @@ export const deploy = async (config: DeployConfig) => {
         cacheConfig,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
-        }
+        },
+        customCloudFrontDistribution: customCFDistribution?.Distribution
       }
     )
     const nextCloudfrontStackOutput = await nextCloudfrontStack.deployStack()
@@ -188,6 +204,19 @@ export const deploy = async (config: DeployConfig) => {
       EnvironmentName: nextRenderServerStackOutput.BeanstalkEnvironmentName,
       VersionLabel: versionLabel
     })
+
+    // if custom cf distribution, update it
+    if (customCFDistribution) {
+      await updateDistribution(cloudfrontClient, customCFDistribution, {
+        longCachePolicyId: nextCloudfrontStackOutput.LongCachePolicyId!,
+        splitCachePolicyId: nextCloudfrontStackOutput.SplitCachePolicyId!,
+        routingFunctionArn: nextCloudfrontStackOutput.RoutingFunctionArn!,
+        checkExpirationFunctionArn: nextCloudfrontStackOutput.CheckExpirationFunctionArn!,
+        staticBucketName: nextCloudfrontStackOutput.StaticBucketRegionalDomainName!,
+        addAdditionalBehaviour: true,
+        skipDefaultBehavior
+      })
+    }
 
     await cloudfrontClient.createInvalidation({
       DistributionId: nextCloudfrontStackOutput.CloudfrontDistributionId!,

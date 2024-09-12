@@ -11,6 +11,8 @@ interface CLIOptions {
   profile?: string
   nodejs?: string
   production?: boolean
+  cloudFrontId?: string
+  skipDefaultBehavior?: boolean
 }
 
 const cli = yargs(hideBin(process.argv))
@@ -40,6 +42,15 @@ const cli = yargs(hideBin(process.argv))
     description: 'Creates production stack.',
     default: false
   })
+  .option('cloudFrontId', {
+    type: 'string',
+    describe: 'Existing cloudfront Id.'
+  })
+  .option('skipDefaultBehavior', {
+    type: 'boolean',
+    description: 'Skip updating default cloudfront default behavior.',
+    default: false
+  })
 
 cli.command<CLIOptions>(
   'bootstrap',
@@ -56,13 +67,15 @@ cli.command<CLIOptions>(
   'app deployment',
   () => {},
   async (argv) => {
-    const { siteName, stage, region, profile, nodejs, production } = argv
+    const { siteName, stage, region, profile, nodejs, production, cloudFrontId, skipDefaultBehavior } = argv
 
     await deploy({
       siteName,
       stage,
       nodejs,
       isProduction: production,
+      cloudFrontId,
+      skipDefaultBehavior,
       aws: {
         region,
         profile
