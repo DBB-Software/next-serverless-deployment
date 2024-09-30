@@ -27,8 +27,8 @@ const setNextOptions = async (nextConfigPath: string, s3BucketName: string) => {
   const updatedConfig = {
     ...currentConfig,
     output: 'standalone',
-    ...currentConfig.serverRuntimeConfig,
     serverRuntimeConfig: {
+      ...currentConfig.serverRuntimeConfig,
       nextServerlessCacheConfig: cacheConfig
     },
     cacheHandler: require.resolve(path.join('..', 'cacheHandler', 'index.js'))

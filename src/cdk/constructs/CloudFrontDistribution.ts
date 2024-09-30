@@ -70,6 +70,10 @@ export class CloudFrontDistribution extends Construct {
     })
 
     const s3Origin = new origins.S3Origin(staticBucket)
+    const nextServerOrigin = new origins.HttpOrigin(ebAppDomain, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      httpPort: 80
+    })
 
     this.cf = new cloudfront.Distribution(this, id, {
       defaultBehavior: {
@@ -99,10 +103,7 @@ export class CloudFrontDistribution extends Construct {
           cachePolicy: splitCachePolicy
         },
         '/_next/image*': {
-          origin: new origins.HttpOrigin(ebAppDomain, {
-            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-            httpPort: 80
-          }),
+          origin: nextServerOrigin,
           cachePolicy: imageCachePolicy
         },
         '/_next/*': {
