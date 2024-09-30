@@ -9,7 +9,7 @@ import { NextRenderServerStack, type NextRenderServerStackProps } from '../cdk/s
 import { NextCloudfrontStack, type NextCloudfrontStackProps } from '../cdk/stacks/NextCloudfrontStack'
 import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION, emptyBucket } from '../common/aws'
 import { AppStack } from '../common/cdk'
-import { getProjectSettings } from '../common/project'
+import { getProjectSettings, loadFile } from '../common/project'
 import loadConfig from './helpers/loadConfig'
 
 export interface DeployConfig {
@@ -73,6 +73,8 @@ export const deploy = async (config: DeployConfig) => {
 
     const cacheConfig = await loadConfig()
 
+    const nextConfig = await loadFile(projectSettings.nextConfigPath)
+
     const outputPath = createOutputFolder()
 
     const clientAWSCredentials = {
@@ -130,6 +132,7 @@ export const deploy = async (config: DeployConfig) => {
         crossRegionReferences: true,
         region,
         cacheConfig,
+        imageTTL: nextConfig.imageTTL,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }

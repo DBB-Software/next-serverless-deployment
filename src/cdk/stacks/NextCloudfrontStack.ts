@@ -13,6 +13,7 @@ export interface NextCloudfrontStackProps extends StackProps {
   ebAppDomain: string
   buildOutputPath: string
   cacheConfig: CacheConfig
+  imageTTL?: number
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -22,7 +23,7 @@ export class NextCloudfrontStack extends Stack {
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
     super(scope, id, props)
-    const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region, cacheConfig } = props
+    const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region, cacheConfig, imageTTL } = props
 
     this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
       nodejs,
@@ -52,7 +53,8 @@ export class NextCloudfrontStack extends Stack {
       ebAppDomain,
       requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
       responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
-      cacheConfig
+      cacheConfig,
+      imageTTL
     })
 
     staticBucket.grantRead(this.routingLambdaEdge.lambdaEdge)
