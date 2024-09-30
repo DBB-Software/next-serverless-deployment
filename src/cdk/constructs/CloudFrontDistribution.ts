@@ -13,19 +13,23 @@ interface CloudFrontPropsDistribution {
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
   responseEdgeFunction: cloudfront.experimental.EdgeFunction
   cacheConfig: CacheConfig
+  imageTTL?: number
 }
 
+const OneDayCache = Duration.days(1)
 const OneMonthCache = Duration.days(30)
 const NoCache = Duration.seconds(0)
+
 const defaultNextQueries = ['_rsc']
 const defaultNextHeaders = ['Cache-Control']
+const imageQueries = ['w', 'h', 'url', 'q']
 export class CloudFrontDistribution extends Construct {
   public readonly cf: cloudfront.Distribution
 
   constructor(scope: Construct, id: string, props: CloudFrontPropsDistribution) {
     super(scope, id)
 
-    const { staticBucket, requestEdgeFunction, responseEdgeFunction, cacheConfig } = props
+    const { staticBucket, requestEdgeFunction, responseEdgeFunction, cacheConfig, ebAppDomain, imageTTL } = props
 
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
       cachePolicyName: `${id}-SplitCachePolicy`,
@@ -53,7 +57,23 @@ export class CloudFrontDistribution extends Construct {
       minTtl: OneMonthCache
     })
 
+    const imageTTLValue = imageTTL ? Duration.seconds(imageTTL) : OneDayCache
+
+    const imageCachePolicy = new cloudfront.CachePolicy(this, 'ImageCachePolicy', {
+      cachePolicyName: `${id}-ImageCachePolicy`,
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList(...imageQueries),
+      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+      headerBehavior: cloudfront.CacheHeaderBehavior.allowList(...defaultNextHeaders),
+      defaultTtl: imageTTLValue,
+      maxTtl: imageTTLValue,
+      minTtl: imageTTLValue
+    })
+
     const s3Origin = new origins.S3Origin(staticBucket)
+    const nextServerOrigin = new origins.HttpOrigin(ebAppDomain, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      httpPort: 80
+    })
 
     this.cf = new cloudfront.Distribution(this, id, {
       defaultBehavior: {
@@ -81,6 +101,10 @@ export class CloudFrontDistribution extends Construct {
             }
           ],
           cachePolicy: splitCachePolicy
+        },
+        '/_next/image*': {
+          origin: nextServerOrigin,
+          cachePolicy: imageCachePolicy
         },
         '/_next/*': {
           origin: s3Origin,

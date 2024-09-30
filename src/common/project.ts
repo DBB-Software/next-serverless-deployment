@@ -53,3 +53,7 @@ export const getProjectSettings = (projectPath: string): ProjectSettings | undef
     currentPath = path.dirname(currentPath)
   }
 }
+
+export const loadFile = async (filePath: string) => {
+  return import(filePath).then((r) => r.default)
+}
