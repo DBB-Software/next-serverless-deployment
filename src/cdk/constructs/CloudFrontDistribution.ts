@@ -98,7 +98,7 @@ export class CloudFrontDistribution extends Construct {
           ],
           cachePolicy: splitCachePolicy
         },
-        '/_next/image': {
+        '/_next/image*': {
           origin: new origins.HttpOrigin(ebAppDomain, {
             protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
             httpPort: 80
