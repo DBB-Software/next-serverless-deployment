@@ -1,3 +1,11 @@
+## [1.2.0](https://github.com/DBB-Software/next-serverless-deployment/compare/v1.1.0...v1.2.0) (2024-10-01)
+
+### Features
+
+* added support of next image route ([2416c60](https://github.com/DBB-Software/next-serverless-deployment/commit/2416c60b50b232f52d00eea73dd6f53427346498))
+* addressed comments ([7561483](https://github.com/DBB-Software/next-serverless-deployment/commit/7561483af84d197488aaa2fae50db7c59185c710))
+* updated image behaviour pattern ([ca5d641](https://github.com/DBB-Software/next-serverless-deployment/commit/ca5d641f182534c6d4c9dd485baca94ffa0e56c5))
+
 ## [1.1.0](https://github.com/DBB-Software/next-serverless-deployment/compare/v1.0.0...v1.1.0) (2024-09-03)
 
 ### Features
