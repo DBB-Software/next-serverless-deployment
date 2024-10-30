@@ -57,7 +57,6 @@ export class BeanstalkDistribution extends Construct {
     })
 
     this.securityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80), 'Allow HTTP traffic')
-    this.securityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443), 'Allow HTTPS traffic')
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, 'EbApp', {
       applicationName: `${id}-eb-app`
