@@ -2,6 +2,7 @@ import { Construct } from 'constructs'
 import * as elasticbeanstalk from 'aws-cdk-lib/aws-elasticbeanstalk'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as iam from 'aws-cdk-lib/aws-iam'
+import { Vpc, Peer, Port, SecurityGroup, SubnetType } from 'aws-cdk-lib/aws-ec2'
 import { RemovalPolicy } from 'aws-cdk-lib'
 import { addOutput } from '../../common/cdk'
 
@@ -25,11 +26,38 @@ export class BeanstalkDistribution extends Construct {
   public readonly ebS3: s3.Bucket
   public readonly ebInstanceProfile: iam.CfnInstanceProfile
   public readonly ebInstanceProfileRole: iam.Role
+  public readonly vpc: Vpc
+  public readonly securityGroup: SecurityGroup
 
   constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
     super(scope, id)
 
     const { stage, nodejs, isProduction, staticS3Bucket, region, appName } = props
+
+    this.vpc = new Vpc(this, 'BeanstalkVPC', {
+      natGateways: 1,
+      subnetConfiguration: [
+        {
+          name: 'Public',
+          subnetType: SubnetType.PUBLIC,
+          cidrMask: 24
+        },
+        {
+          name: 'Private',
+          subnetType: SubnetType.PRIVATE_WITH_EGRESS,
+          cidrMask: 24
+        }
+      ]
+    })
+
+    this.securityGroup = new SecurityGroup(this, 'BeanstalkSG', {
+      vpc: this.vpc,
+      description: 'Security Group for Elastic Beanstalk render server',
+      allowAllOutbound: true
+    })
+
+    this.securityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80), 'Allow HTTP traffic')
+    this.securityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443), 'Allow HTTPS traffic')
 
     this.ebApp = new elasticbeanstalk.CfnApplication(this, 'EbApp', {
       applicationName: `${id}-eb-app`
@@ -55,6 +83,9 @@ export class BeanstalkDistribution extends Construct {
     // Uses nodejs 20 as a fallback.
     // Available platforms: https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platforms-supported.html#platforms-supported.nodejs
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
+
+    const publicSubnets = this.vpc.selectSubnets({ subnetType: SubnetType.PUBLIC }).subnetIds
+    const privateSubnets = this.vpc.selectSubnets({ subnetType: SubnetType.PRIVATE_WITH_EGRESS }).subnetIds
 
     this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, 'EbEnv', {
       environmentName: `${appName}-eb-env`,
@@ -90,6 +121,26 @@ export class BeanstalkDistribution extends Construct {
           namespace: 'aws:autoscaling:launchconfiguration',
           optionName: 'IamInstanceProfile',
           value: this.ebInstanceProfile.attrArn
+        },
+        {
+          namespace: 'aws:autoscaling:launchconfiguration',
+          optionName: 'SecurityGroups',
+          value: this.securityGroup.securityGroupId
+        },
+        {
+          namespace: 'aws:ec2:vpc',
+          optionName: 'VPCId',
+          value: this.vpc.vpcId
+        },
+        {
+          namespace: 'aws:ec2:vpc',
+          optionName: 'Subnets',
+          value: privateSubnets.join(',')
+        },
+        {
+          namespace: 'aws:ec2:vpc',
+          optionName: 'ELBSubnets',
+          value: publicSubnets.join(',')
         }
       ]
     })
