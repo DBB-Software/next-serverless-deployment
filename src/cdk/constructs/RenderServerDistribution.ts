@@ -6,13 +6,16 @@ import { Vpc, Peer, Port, SecurityGroup, SubnetType } from 'aws-cdk-lib/aws-ec2'
 import { RemovalPolicy } from 'aws-cdk-lib'
 import { addOutput } from '../../common/cdk'
 
-interface BeanstalkDistributionProps {
+interface RenderServerDistributionProps {
   stage: string
   nodejs?: string
   isProduction?: boolean
   staticS3Bucket: s3.Bucket
   region: string
   appName: string
+  instanceType?: string
+  minInstances?: number
+  maxInstances?: number
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
@@ -20,7 +23,7 @@ const NodeJSEnvironmentMapping: Record<string, string> = {
   '20': '64bit Amazon Linux 2023 v6.1.7 running Node.js 20'
 }
 
-export class BeanstalkDistribution extends Construct {
+export class RenderServerDistribution extends Construct {
   public readonly ebApp: elasticbeanstalk.CfnApplication
   public readonly ebEnv: elasticbeanstalk.CfnEnvironment
   public readonly ebS3: s3.Bucket
@@ -29,10 +32,20 @@ export class BeanstalkDistribution extends Construct {
   public readonly vpc: Vpc
   public readonly securityGroup: SecurityGroup
 
-  constructor(scope: Construct, id: string, props: BeanstalkDistributionProps) {
+  constructor(scope: Construct, id: string, props: RenderServerDistributionProps) {
     super(scope, id)
 
-    const { stage, nodejs, isProduction, staticS3Bucket, region, appName } = props
+    const {
+      stage,
+      nodejs,
+      isProduction,
+      staticS3Bucket,
+      region,
+      appName,
+      instanceType = 't2.micro',
+      minInstances = 1,
+      maxInstances = 2
+    } = props
 
     this.vpc = new Vpc(this, 'BeanstalkVPC', {
       natGateways: 1,
@@ -114,7 +127,7 @@ export class BeanstalkDistribution extends Construct {
         {
           namespace: 'aws:autoscaling:launchconfiguration',
           optionName: 'InstanceType',
-          value: 't2.micro'
+          value: instanceType
         },
         {
           namespace: 'aws:autoscaling:launchconfiguration',
@@ -125,6 +138,41 @@ export class BeanstalkDistribution extends Construct {
           namespace: 'aws:autoscaling:launchconfiguration',
           optionName: 'SecurityGroups',
           value: this.securityGroup.securityGroupId
+        },
+        {
+          namespace: 'aws:autoscaling:asg',
+          optionName: 'MinSize',
+          value: minInstances.toString()
+        },
+        {
+          namespace: 'aws:autoscaling:asg',
+          optionName: 'MaxSize',
+          value: maxInstances.toString()
+        },
+        {
+          namespace: 'aws:autoscaling:trigger',
+          optionName: 'MeasureName',
+          value: 'CPUUtilization'
+        },
+        {
+          namespace: 'aws:autoscaling:trigger',
+          optionName: 'Statistic',
+          value: 'Average'
+        },
+        {
+          namespace: 'aws:autoscaling:trigger',
+          optionName: 'Unit',
+          value: 'Percent'
+        },
+        {
+          namespace: 'aws:autoscaling:trigger',
+          optionName: 'UpperThreshold',
+          value: '75'
+        },
+        {
+          namespace: 'aws:autoscaling:trigger',
+          optionName: 'LowerThreshold',
+          value: '40'
         },
         {
           namespace: 'aws:ec2:vpc',
