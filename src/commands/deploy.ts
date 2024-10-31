@@ -17,6 +17,9 @@ export interface DeployConfig {
   stage?: string
   nodejs?: string
   isProduction?: boolean
+  renderServerInstanceType?: string
+  renderServerMinInstances?: number
+  renderServerMaxInstances?: number
   aws: {
     region?: string
     profile?: string
@@ -53,7 +56,14 @@ const createOutputFolder = () => {
 export const deploy = async (config: DeployConfig) => {
   let cleanNextApp
   try {
-    const { siteName, stage = 'development', aws } = config
+    const {
+      siteName,
+      stage = 'development',
+      aws,
+      renderServerInstanceType,
+      renderServerMaxInstances,
+      renderServerMinInstances
+    } = config
     const credentials = await getAWSCredentials({ region: config.aws.region, profile: config.aws.profile })
     const region = aws.region || process.env.REGION
 
@@ -111,6 +121,9 @@ export const deploy = async (config: DeployConfig) => {
         isProduction: config.isProduction,
         crossRegionReferences: true,
         region,
+        renderServerInstanceType,
+        renderServerMaxInstances,
+        renderServerMinInstances,
         env: {
           region
         }
