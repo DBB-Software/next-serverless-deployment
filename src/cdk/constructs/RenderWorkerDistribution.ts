@@ -23,7 +23,7 @@ interface RenderWorkerProps {
   /** The deployment stage (e.g., 'dev', 'prod') */
   stage: string
   /** The Node.js version to use. Defaults to '20' */
-  nodejs?: keyof typeof NODE_VERSIONS
+  nodejs?: string
   /** Whether this is a production environment. Affects removal policies. Defaults to false */
   isProduction?: boolean
   /** The S3 bucket for storing static assets */
@@ -47,7 +47,7 @@ interface RenderWorkerProps {
  * @class RenderWorkerStack
  * @extends {Construct}
  */
-export class RenderWorkerStack extends Construct {
+export class RenderWorkerDistribution extends Construct {
   /** The Elastic Beanstalk application */
   public readonly application: elasticbeanstalk.CfnApplication
   /** The Elastic Beanstalk environment */

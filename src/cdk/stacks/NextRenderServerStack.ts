@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import { RenderServerDistribution } from '../constructs/RenderServerDistribution'
+import { RenderWorkerDistribution } from '../constructs/RenderWorkerDistribution'
 import { addOutput } from '../../common/cdk'
 
 export interface NextRenderServerStackProps extends cdk.StackProps {
@@ -16,6 +17,7 @@ export interface NextRenderServerStackProps extends cdk.StackProps {
 
 export class NextRenderServerStack extends cdk.Stack {
   public readonly renderServer: RenderServerDistribution
+  public readonly renderWorker: RenderWorkerDistribution
   public readonly staticBucket: s3.Bucket
   public readonly staticBucketName: string
 
@@ -54,6 +56,18 @@ export class NextRenderServerStack extends cdk.Stack {
       region,
       appName: id,
       instanceType: renderServerInstanceType,
+      minInstances: renderServerMinInstances,
+      maxInstances: renderServerMaxInstances
+    })
+
+    this.renderWorker = new RenderWorkerDistribution(this, `${id}-renderWorker`, {
+      stage,
+      nodejs,
+      isProduction,
+      staticS3Bucket: this.staticBucket,
+      region,
+      appName: id,
+      instanceType: renderServerInstanceType, // TODO: separate options from server and worker
       minInstances: renderServerMinInstances,
       maxInstances: renderServerMaxInstances
     })
