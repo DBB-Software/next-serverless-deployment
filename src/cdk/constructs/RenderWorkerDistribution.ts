@@ -5,14 +5,15 @@ import * as iam from 'aws-cdk-lib/aws-iam'
 import * as sqs from 'aws-cdk-lib/aws-sqs'
 import { Vpc, Peer, Port, SecurityGroup, SubnetType } from 'aws-cdk-lib/aws-ec2'
 import { Duration, RemovalPolicy } from 'aws-cdk-lib'
+import { addOutput } from '../../common/cdk'
 
 /**
  * Supported Node.js versions for the Elastic Beanstalk environment
  * Maps version numbers to their corresponding Amazon Linux 2023 solution stack names
  */
-const NODE_VERSIONS = {
-  '18': '64bit Amazon Linux 2023 v6.1.7 running Node.js 18',
-  '20': '64bit Amazon Linux 2023 v6.1.7 running Node.js 20'
+const NODE_VERSIONS: Record<string, string> = {
+  '18': '64bit Amazon Linux 2023 v6.2.2 running Node.js 18',
+  '20': '64bit Amazon Linux 2023 v6.2.2 running Node.js 20'
 } as const
 
 /**
@@ -207,8 +208,7 @@ export class RenderWorkerDistribution extends Construct {
       solutionStackName: NODE_VERSIONS[nodejs],
       tier: {
         name: 'Worker',
-        type: 'SQS/HTTP',
-        version: '1.0'
+        type: 'SQS/HTTP'
       },
       optionSettings: [
         // Application Environment Variables
@@ -282,11 +282,6 @@ export class RenderWorkerDistribution extends Construct {
         },
         {
           namespace: 'aws:elasticbeanstalk:sqsd',
-          optionName: 'HttpMethod',
-          value: 'POST'
-        },
-        {
-          namespace: 'aws:elasticbeanstalk:sqsd',
           optionName: 'InactivityTimeout',
           value: '299'
         },
@@ -322,5 +317,10 @@ export class RenderWorkerDistribution extends Construct {
       removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
       autoDeleteObjects: !isProduction
     })
+
+    addOutput(this, `${appName}-RenderWorkerQueueUrl`, this.workerQueue.queueUrl)
+    addOutput(this, `${appName}-RenderWorkerApplicationName`, this.application.applicationName!)
+    addOutput(this, `${appName}-RenderWorkerEnvironmentName`, this.environment.environmentName!)
+    addOutput(this, `${appName}-RenderWorkerVersionsBucketName`, this.versionsBucket.bucketName)
   }
 }

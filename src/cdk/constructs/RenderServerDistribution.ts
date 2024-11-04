@@ -19,8 +19,8 @@ interface RenderServerDistributionProps {
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
-  '18': '64bit Amazon Linux 2023 v6.1.7 running Node.js 18',
-  '20': '64bit Amazon Linux 2023 v6.1.7 running Node.js 20'
+  '18': '64bit Amazon Linux 2023 v6.2.2 running Node.js 18',
+  '20': '64bit Amazon Linux 2023 v6.2.2 running Node.js 20'
 }
 
 export class RenderServerDistribution extends Construct {
@@ -197,9 +197,9 @@ export class RenderServerDistribution extends Construct {
       autoDeleteObjects: !isProduction
     })
 
-    addOutput(this, `${appName}-BeanstalkDomain`, this.ebEnv.attrEndpointUrl)
-    addOutput(this, `${appName}-BeanstalkApplicationName`, this.ebApp.applicationName!)
-    addOutput(this, `${appName}-BeanstalkEnvironmentName`, this.ebEnv.environmentName!)
-    addOutput(this, `${appName}-BeanstalkVersionsBucketName`, this.ebS3.bucketName)
+    addOutput(this, `${appName}-RenderServerDomain`, this.ebEnv.attrEndpointUrl)
+    addOutput(this, `${appName}-RenderServerApplicationName`, this.ebApp.applicationName!)
+    addOutput(this, `${appName}-RenderServerEnvironmentName`, this.ebEnv.environmentName!)
+    addOutput(this, `${appName}-RenderServerVersionsBucketName`, this.ebS3.bucketName)
   }
 }
