@@ -13,7 +13,7 @@ import {
   GetTemplateCommand
 } from '@aws-sdk/client-cloudformation'
 import path from 'node:path'
-import isEqual from 'lodash.isequal'
+import isEqual from 'lodash/isEqual'
 
 import { getCDKAssetsPublisher } from './aws'
 
