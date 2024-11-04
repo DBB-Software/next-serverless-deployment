@@ -140,7 +140,8 @@ export const deploy = async (config: DeployConfig) => {
         profile: config.aws.profile,
         nodejs: config.nodejs,
         staticBucketName: nextRenderServerStackOutput.StaticBucketName,
-        ebAppDomain: nextRenderServerStackOutput.BeanstalkDomain,
+        renderServerDomain: nextRenderServerStackOutput.RenderServerDomain,
+        renderWorkerQueueUrl: nextRenderServerStackOutput.RenderWorkerQueueUrl,
         buildOutputPath: outputPath,
         crossRegionReferences: true,
         region,
@@ -185,23 +186,45 @@ export const deploy = async (config: DeployConfig) => {
 
     // upload code version to bucket.
     await uploadFileToS3(s3Client, {
-      Bucket: nextRenderServerStackOutput.BeanstalkVersionsBucketName,
+      Bucket: nextRenderServerStackOutput.RenderServerVersionsBucketName,
       Key: `${versionLabel}.zip`,
       Body: fs.readFileSync(buildOutputPathArchived)
     })
 
     await ebClient.createApplicationVersion({
-      ApplicationName: nextRenderServerStackOutput.BeanstalkApplicationName,
+      ApplicationName: nextRenderServerStackOutput.RenderServerApplicationName,
       VersionLabel: versionLabel,
       SourceBundle: {
-        S3Bucket: nextRenderServerStackOutput.BeanstalkVersionsBucketName,
+        S3Bucket: nextRenderServerStackOutput.RenderServerVersionsBucketName,
         S3Key: `${versionLabel}.zip`
       }
     })
 
     await ebClient.updateEnvironment({
-      ApplicationName: nextRenderServerStackOutput.BeanstalkApplicationName,
-      EnvironmentName: nextRenderServerStackOutput.BeanstalkEnvironmentName,
+      ApplicationName: nextRenderServerStackOutput.RenderServerApplicationName,
+      EnvironmentName: nextRenderServerStackOutput.RenderServerEnvironmentName,
+      VersionLabel: versionLabel
+    })
+
+    // upload code version to bucket.
+    await uploadFileToS3(s3Client, {
+      Bucket: nextRenderServerStackOutput.RenderWorkerVersionsBucketName,
+      Key: `${versionLabel}.zip`,
+      Body: fs.readFileSync(buildOutputPathArchived)
+    })
+
+    await ebClient.createApplicationVersion({
+      ApplicationName: nextRenderServerStackOutput.RenderWorkerApplicationName,
+      VersionLabel: versionLabel,
+      SourceBundle: {
+        S3Bucket: nextRenderServerStackOutput.RenderWorkerVersionsBucketName,
+        S3Key: `${versionLabel}.zip`
+      }
+    })
+
+    await ebClient.updateEnvironment({
+      ApplicationName: nextRenderServerStackOutput.RenderWorkerApplicationName,
+      EnvironmentName: nextRenderServerStackOutput.RenderWorkerEnvironmentName,
       VersionLabel: versionLabel
     })
 

@@ -3,18 +3,15 @@ import * as cdk from 'aws-cdk-lib'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as logs from 'aws-cdk-lib/aws-logs'
-import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
 import { buildLambda } from '../../build/edge'
 import { CacheConfig } from '../../types'
 
 interface CheckExpirationLambdaEdgeProps extends cdk.StackProps {
-  bucketName: string
-  ebAppDomain: string
+  renderWorkerQueueUrl: string
   buildOutputPath: string
   nodejs?: string
   cacheConfig: CacheConfig
-  bucketRegion?: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -26,7 +23,7 @@ export class CheckExpirationLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: CheckExpirationLambdaEdgeProps) {
-    const { bucketName, bucketRegion, ebAppDomain, nodejs, buildOutputPath, cacheConfig } = props
+    const { nodejs, buildOutputPath, cacheConfig, renderWorkerQueueUrl } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -34,9 +31,7 @@ export class CheckExpirationLambdaEdge extends Construct {
 
     buildLambda(name, buildOutputPath, {
       define: {
-        'process.env.S3_BUCKET': JSON.stringify(bucketName),
-        'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
-        'process.env.EB_APP_URL': JSON.stringify(ebAppDomain),
+        'process.env.RENDER_QUEUE_URL': JSON.stringify(renderWorkerQueueUrl),
         'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig)
       }
     })
@@ -55,12 +50,5 @@ export class CheckExpirationLambdaEdge extends Construct {
     })
 
     logGroup.grantWrite(this.lambdaEdge)
-
-    const policyStatement = new iam.PolicyStatement({
-      actions: ['logs:CreateLogStream', 'logs:PutLogEvents', 's3:GetObject'],
-      resources: [`${logGroup.logGroupArn}:*`, `arn:aws:s3:::${bucketName}/*`]
-    })
-
-    this.lambdaEdge.addToRolePolicy(policyStatement)
   }
 }
