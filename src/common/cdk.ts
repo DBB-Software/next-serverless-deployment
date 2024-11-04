@@ -13,6 +13,7 @@ import {
   GetTemplateCommand
 } from '@aws-sdk/client-cloudformation'
 import path from 'node:path'
+import isEqual from 'lodash.isequal'
 
 import { getCDKAssetsPublisher } from './aws'
 
@@ -144,7 +145,7 @@ export class AppStack<T extends cdk.Stack, U> {
 
     if (ifStackExists) {
       const currentTemplate = await this.getCurrentStackTemplate()
-      if (currentTemplate !== JSON.stringify(this.stackTemplate)) {
+      if (!isEqual(JSON.parse(currentTemplate), this.stackTemplate)) {
         await this.updateStack()
       }
     } else {
