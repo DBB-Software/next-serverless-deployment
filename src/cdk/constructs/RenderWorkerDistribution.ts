@@ -278,7 +278,7 @@ export class RenderWorkerDistribution extends Construct {
         {
           namespace: 'aws:elasticbeanstalk:sqsd',
           optionName: 'HttpPath',
-          value: '/'
+          value: '/api/revalidate'
         },
         {
           namespace: 'aws:elasticbeanstalk:sqsd',
