@@ -13,6 +13,7 @@ export interface ProjectSettings {
   isMonorepo: boolean
   projectPath: string
   nextConfigPath: string
+  isAppDir: boolean
 }
 
 export const findPackager = (appPath: string): ProjectPackager | undefined => {
@@ -27,6 +28,10 @@ export const findPackager = (appPath: string): ProjectPackager | undefined => {
 
 export const findNextConfig = (appPath: string): string | undefined => {
   return ['next.config.js', 'next.config.mjs'].find((config) => fs.existsSync(path.join(appPath, config)))
+}
+
+const checkIsAppDir = (appPath: string): boolean => {
+  return fs.existsSync(path.join(appPath, 'src', 'app'))
 }
 
 export const getProjectSettings = (projectPath: string): ProjectSettings | undefined => {
@@ -46,7 +51,8 @@ export const getProjectSettings = (projectPath: string): ProjectSettings | undef
         packager,
         isMonorepo: currentPath !== projectPath,
         projectPath,
-        nextConfigPath: path.join(projectPath, nextConfig)
+        nextConfigPath: path.join(projectPath, nextConfig),
+        isAppDir: checkIsAppDir(projectPath)
       }
     }
 

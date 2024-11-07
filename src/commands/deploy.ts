@@ -142,6 +142,7 @@ export const deploy = async (config: DeployConfig) => {
         staticBucketName: nextRenderServerStackOutput.StaticBucketName,
         renderServerDomain: nextRenderServerStackOutput.RenderServerDomain,
         renderWorkerQueueUrl: nextRenderServerStackOutput.RenderWorkerQueueUrl,
+        renderWorkerQueueArn: nextRenderServerStackOutput.RenderWorkerQueueArn,
         buildOutputPath: outputPath,
         crossRegionReferences: true,
         region,
@@ -242,6 +243,6 @@ export const deploy = async (config: DeployConfig) => {
     console.error('Failed to deploy:', err)
   } finally {
     cleanOutputFolder()
-    cleanNextApp?.()
+    await cleanNextApp?.()
   }
 }

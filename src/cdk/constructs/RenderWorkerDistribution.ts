@@ -95,7 +95,8 @@ export class RenderWorkerDistribution extends Construct {
     this.deadLetterQueue = new sqs.Queue(this, 'DeadLetterQueue', {
       queueName: `${appName}-dead-letter-queue`,
       retentionPeriod: Duration.days(14),
-      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      fifo: true
     })
 
     /**
@@ -108,7 +109,8 @@ export class RenderWorkerDistribution extends Construct {
         queue: this.deadLetterQueue,
         maxReceiveCount: 3
       },
-      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+      fifo: true
     })
 
     /**
@@ -319,6 +321,7 @@ export class RenderWorkerDistribution extends Construct {
     })
 
     addOutput(this, `${appName}-RenderWorkerQueueUrl`, this.workerQueue.queueUrl)
+    addOutput(this, `${appName}-RenderWorkerQueueArn`, this.workerQueue.queueArn)
     addOutput(this, `${appName}-RenderWorkerApplicationName`, this.application.applicationName!)
     addOutput(this, `${appName}-RenderWorkerEnvironmentName`, this.environment.environmentName!)
     addOutput(this, `${appName}-RenderWorkerVersionsBucketName`, this.versionsBucket.bucketName)
