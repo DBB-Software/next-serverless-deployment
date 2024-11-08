@@ -10,7 +10,7 @@ import { CacheConfig } from '../../types'
 
 interface RoutingLambdaEdgeProps extends cdk.StackProps {
   bucketName: string
-  ebAppDomain: string
+  renderServerDomain: string
   buildOutputPath: string
   nodejs?: string
   cacheConfig: CacheConfig
@@ -26,7 +26,7 @@ export class RoutingLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: RoutingLambdaEdgeProps) {
-    const { bucketName, bucketRegion, ebAppDomain, nodejs, buildOutputPath, cacheConfig } = props
+    const { bucketName, bucketRegion, renderServerDomain, nodejs, buildOutputPath, cacheConfig } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -36,7 +36,7 @@ export class RoutingLambdaEdge extends Construct {
       define: {
         'process.env.S3_BUCKET': JSON.stringify(bucketName),
         'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
-        'process.env.EB_APP_URL': JSON.stringify(ebAppDomain),
+        'process.env.EB_APP_URL': JSON.stringify(renderServerDomain),
         'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig)
       }
     })

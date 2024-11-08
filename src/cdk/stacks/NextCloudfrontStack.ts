@@ -10,7 +10,8 @@ export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
   region?: string
   staticBucketName: string
-  ebAppDomain: string
+  renderServerDomain: string
+  renderWorkerQueueUrl: string
   buildOutputPath: string
   cacheConfig: CacheConfig
   imageTTL?: number
@@ -23,12 +24,21 @@ export class NextCloudfrontStack extends Stack {
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
     super(scope, id, props)
-    const { nodejs, buildOutputPath, staticBucketName, ebAppDomain, region, cacheConfig, imageTTL } = props
+    const {
+      nodejs,
+      buildOutputPath,
+      staticBucketName,
+      renderServerDomain,
+      renderWorkerQueueUrl,
+      region,
+      cacheConfig,
+      imageTTL
+    } = props
 
     this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
-      ebAppDomain,
+      renderServerDomain,
       buildOutputPath,
       cacheConfig,
       bucketRegion: region
@@ -36,11 +46,9 @@ export class NextCloudfrontStack extends Stack {
 
     this.checkExpLambdaEdge = new CheckExpirationLambdaEdge(this, `${id}-CheckExpirationLambdaEdge`, {
       nodejs,
-      bucketName: staticBucketName,
-      ebAppDomain,
+      renderWorkerQueueUrl,
       buildOutputPath,
-      cacheConfig,
-      bucketRegion: region
+      cacheConfig
     })
 
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
@@ -50,7 +58,7 @@ export class NextCloudfrontStack extends Stack {
 
     this.cloudfront = new CloudFrontDistribution(this, `${id}-NextCloudFront`, {
       staticBucket,
-      ebAppDomain,
+      renderServerDomain,
       requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
       responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
       cacheConfig,
