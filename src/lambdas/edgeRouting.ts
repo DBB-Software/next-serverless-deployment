@@ -43,7 +43,7 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const fileExtension = getFileExtensionTypeFromRequest(request)
 
   const cacheKey = [
-    cacheConfig.enableDeviceSplit ? getCurrentDeviceType(request.headers) : null,
+    cacheConfig.enableDeviceSplit ? getCurrentDeviceType(request.headers) : undefined,
     buildCacheKey(
       cacheConfig.cacheCookies?.toSorted() ?? [],
       transformCookiesToObject(request.headers.cookie),

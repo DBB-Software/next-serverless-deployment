@@ -101,10 +101,10 @@ export function transformCookiesToObject(cookies: Array<{ key?: string | undefin
  */
 export function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | undefined) {
   const deviceHeaders = convertCloudFrontHeaders(headers, Object.values(HEADER_DEVICE_TYPE))
-  if (!deviceHeaders || !Object.keys(deviceHeaders).length) return null
+  if (!deviceHeaders || !Object.keys(deviceHeaders).length) return
 
   if (deviceHeaders[HEADER_DEVICE_TYPE.Desktop] === 'true') {
-    return null
+    return
   } else if (deviceHeaders[HEADER_DEVICE_TYPE.Mobile] === 'true') {
     return 'mobile'
   } else if (deviceHeaders[HEADER_DEVICE_TYPE.Tablet] === 'true') {
@@ -113,7 +113,7 @@ export function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | und
     return 'smarttv'
   }
 
-  return null
+  return
 }
 
 /**

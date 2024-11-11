@@ -1,4 +1,4 @@
-import type { CloudFrontRequestCallback, Context, CloudFrontResponseEvent } from 'aws-lambda'
+import type { CloudFrontRequestCallback, Context, CloudFrontResponseEvent, CloudFrontHeaders } from 'aws-lambda'
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
 
 const sqs = new SQSClient({ region: process.env.QUEUE_REGION! })
@@ -11,7 +11,7 @@ const sqs = new SQSClient({ region: process.env.QUEUE_REGION! })
  * @param headers['last-modified'] - Last-Modified header value
  * @returns boolean indicating if the file is expired
  */
-function checkFileIsExpired(headers: Record<string, any>): boolean {
+function checkFileIsExpired(headers: CloudFrontHeaders): boolean {
   const expiresHeader = headers['expires'] ? headers['expires'][0].value : null
   const cacheControlHeader = headers['cache-control'] ? headers['cache-control'][0].value : null
   const lastModifiedHeader = headers['last-modified'] ? headers['last-modified'][0].value : null
