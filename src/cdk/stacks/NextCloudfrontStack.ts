@@ -8,10 +8,11 @@ import { CheckExpirationLambdaEdge } from '../constructs/CheckExpirationLambdaEd
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
-  region?: string
+  region: string
   staticBucketName: string
   renderServerDomain: string
   renderWorkerQueueUrl: string
+  renderWorkerQueueArn: string
   buildOutputPath: string
   cacheConfig: CacheConfig
   imageTTL?: number
@@ -30,6 +31,7 @@ export class NextCloudfrontStack extends Stack {
       staticBucketName,
       renderServerDomain,
       renderWorkerQueueUrl,
+      renderWorkerQueueArn,
       region,
       cacheConfig,
       imageTTL
@@ -48,7 +50,9 @@ export class NextCloudfrontStack extends Stack {
       nodejs,
       renderWorkerQueueUrl,
       buildOutputPath,
-      cacheConfig
+      cacheConfig,
+      renderWorkerQueueArn,
+      region
     })
 
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {

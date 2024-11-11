@@ -1,4 +1,5 @@
 import { Construct } from 'constructs'
+import * as iam from 'aws-cdk-lib/aws-iam'
 import * as cdk from 'aws-cdk-lib'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
@@ -9,9 +10,11 @@ import { CacheConfig } from '../../types'
 
 interface CheckExpirationLambdaEdgeProps extends cdk.StackProps {
   renderWorkerQueueUrl: string
+  renderWorkerQueueArn: string
   buildOutputPath: string
   nodejs?: string
   cacheConfig: CacheConfig
+  region: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -23,7 +26,7 @@ export class CheckExpirationLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: CheckExpirationLambdaEdgeProps) {
-    const { nodejs, buildOutputPath, cacheConfig, renderWorkerQueueUrl } = props
+    const { nodejs, buildOutputPath, cacheConfig, renderWorkerQueueUrl, renderWorkerQueueArn, region } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -32,7 +35,8 @@ export class CheckExpirationLambdaEdge extends Construct {
     buildLambda(name, buildOutputPath, {
       define: {
         'process.env.RENDER_QUEUE_URL': JSON.stringify(renderWorkerQueueUrl),
-        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig)
+        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig),
+        'process.env.QUEUE_REGION': JSON.stringify(region)
       }
     })
 
@@ -48,6 +52,13 @@ export class CheckExpirationLambdaEdge extends Construct {
       handler: 'index.handler',
       logGroup
     })
+
+    this.lambdaEdge.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['sqs:SendMessage'],
+        resources: [renderWorkerQueueArn]
+      })
+    )
 
     logGroup.grantWrite(this.lambdaEdge)
   }

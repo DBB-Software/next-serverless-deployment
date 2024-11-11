@@ -1,78 +1,17 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
-import http, { type RequestOptions } from 'http'
 import crypto from 'node:crypto'
 import { CacheConfig } from '../types'
-import { HEADER_DEVICE_TYPE } from '../constants'
+import {
+  makeHTTPRequest,
+  convertCloudFrontHeaders,
+  transformQueryToObject,
+  transformCookiesToObject,
+  getCurrentDeviceType,
+  getFileExtensionTypeFromRequest
+} from './utils/request'
 
 const s3 = new S3Client({ region: process.env.S3_BUCKET_REGION! })
-
-async function makeHTTPRequest(options: RequestOptions): Promise<{
-  body: string
-  statusCode?: number
-  statusMessage?: string
-}> {
-  return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
-      let data = ''
-
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-
-      res.on('end', () => {
-        resolve({
-          body: data,
-          statusCode: res.statusCode,
-          statusMessage: res.statusMessage
-        })
-      })
-    })
-
-    req.on('error', (e) => {
-      reject(e)
-    })
-
-    req.end()
-  })
-}
-
-function convertCloudFrontHeaders(
-  cloudfrontHeaders: CloudFrontRequest['headers'] | undefined,
-  allowHeaders?: string[]
-): RequestOptions['headers'] {
-  if (!cloudfrontHeaders) return {}
-
-  return Object.keys(cloudfrontHeaders).reduce(
-    (prev, key) =>
-      !allowHeaders?.length || allowHeaders.includes(key)
-        ? {
-            ...prev,
-            [key]: cloudfrontHeaders[key][0].value
-          }
-        : prev,
-    {}
-  )
-}
-
-function transformQueryToObject(query: string) {
-  return query ? Object.fromEntries(new URLSearchParams(query).entries()) : {}
-}
-
-function transformCookiesToObject(cookies: Array<{ key?: string | undefined; value: string }>) {
-  if (!cookies?.length) return {}
-
-  return cookies.reduce(
-    (res, { value }) => {
-      value.split(';').forEach((cookie) => {
-        const [key, val] = cookie.split('=').map((part) => part.trim())
-        res[key] = val
-      })
-      return res
-    },
-    {} as Record<string, string>
-  )
-}
 
 function buildCacheKey(keys: string[], data: Record<string, string | string[]>, prefix: string) {
   if (!keys.length) return null
@@ -80,38 +19,6 @@ function buildCacheKey(keys: string[], data: Record<string, string | string[]>, 
   const cacheKeys = keys.reduce<string[]>((prev, curr) => (!data[curr] ? prev : [...prev, `${curr}=${data[curr]}`]), [])
 
   return !cacheKeys.length ? null : `${prefix}(${cacheKeys.join('-')})`
-}
-
-function getCurrentDeviceType(headers: CloudFrontRequest['headers'] | undefined) {
-  const deviceHeaders = convertCloudFrontHeaders(headers, Object.values(HEADER_DEVICE_TYPE))
-  if (!deviceHeaders || !Object.keys(deviceHeaders).length) return null
-
-  if (deviceHeaders[HEADER_DEVICE_TYPE.Desktop] === 'true') {
-    return null
-  } else if (deviceHeaders[HEADER_DEVICE_TYPE.Mobile] === 'true') {
-    return 'mobile'
-  } else if (deviceHeaders[HEADER_DEVICE_TYPE.Tablet] === 'true') {
-    return 'tablet'
-  } else if (deviceHeaders[HEADER_DEVICE_TYPE.SmartTV] === 'true') {
-    return 'smarttv'
-  }
-
-  return null
-}
-
-function getFileExtensionTypeFromRequest(request: CloudFrontRequest) {
-  const contentType = request.headers['content-type']?.[0]?.value ?? ''
-  const isRSC = request.querystring.includes('_rsc')
-
-  if (isRSC) {
-    return 'rsc'
-  }
-
-  if (contentType.includes('json') || request.uri.endsWith('.json')) {
-    return 'json'
-  }
-
-  return 'html'
 }
 
 function getPageKeyFromRequest(request: CloudFrontRequest) {
@@ -136,7 +43,7 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   const fileExtension = getFileExtensionTypeFromRequest(request)
 
   const cacheKey = [
-    cacheConfig.enableDeviceSplit ? getCurrentDeviceType(request.headers) : null,
+    cacheConfig.enableDeviceSplit ? getCurrentDeviceType(request.headers) : undefined,
     buildCacheKey(
       cacheConfig.cacheCookies?.toSorted() ?? [],
       transformCookiesToObject(request.headers.cookie),
@@ -182,6 +89,7 @@ export const handler = async (
   const { s3Key } = getS3ObjectPath(request, cacheConfig)
   const ebAppUrl = process.env.EB_APP_URL!
   const originalUri = request.uri
+  const queryParams = request.querystring ? `?${request.querystring}` : ''
 
   try {
     // Check if file exists in S3
@@ -189,14 +97,14 @@ export const handler = async (
 
     if (isFileExists) {
       // Modify s3 path request
-      request.uri = `/${s3Key}`
+      request.uri = `/${s3Key}${queryParams}`
 
       // If file exists, allow the request to proceed to S3
       callback(null, request)
     } else {
-      const options: http.RequestOptions = {
+      const options = {
         hostname: ebAppUrl,
-        path: `${originalUri}${request.querystring ? `?${request.querystring}` : ''}`,
+        path: `${originalUri}${queryParams}`,
         method: request.method,
         headers: convertCloudFrontHeaders(request.headers)
       }
