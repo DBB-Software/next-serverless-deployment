@@ -93,7 +93,7 @@ export class RenderWorkerDistribution extends Construct {
      * Messages will be retained for 14 days
      */
     this.deadLetterQueue = new sqs.Queue(this, 'DeadLetterQueue', {
-      queueName: `${appName}-dead-letter-queue`,
+      queueName: `${appName}-dead-letter-queue.fifo`,
       retentionPeriod: Duration.days(14),
       removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
       fifo: true
@@ -104,7 +104,7 @@ export class RenderWorkerDistribution extends Construct {
      * Failed messages will be moved to DLQ after 3 failed attempts
      */
     this.workerQueue = new sqs.Queue(this, 'WorkerQueue', {
-      queueName: `${appName}-worker-queue`,
+      queueName: `${appName}-worker-queue.fifo`,
       deadLetterQueue: {
         queue: this.deadLetterQueue,
         maxReceiveCount: 3
@@ -157,7 +157,7 @@ export class RenderWorkerDistribution extends Construct {
      */
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: ['s3:Get*', 's3:Put*', 's3:ListBucket'],
+        actions: ['s3:Get*', 's3:Put*', 's3:Delete*', 's3:ListBucket'],
         resources: [staticS3Bucket.bucketArn, `${staticS3Bucket.bucketArn}/*`]
       })
     )

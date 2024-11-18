@@ -82,7 +82,7 @@ export class RenderServerDistribution extends Construct {
 
     this.ebInstanceProfileRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: ['s3:Get*', 's3:Put*', 's3:ListBucket'],
+        actions: ['s3:Get*', 's3:Put*', 's3:Delete*', 's3:ListBucket'],
         resources: [staticS3Bucket.bucketArn, `${staticS3Bucket.bucketArn}/*`]
       })
     )
