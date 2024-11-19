@@ -15,7 +15,8 @@
     },
     "plugins": [
         "@typescript-eslint",
-        "prettier"
+        "prettier",
+        "jest"
     ],
     "rules": {
         "semi": ["error", "never"],

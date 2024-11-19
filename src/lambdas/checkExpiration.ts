@@ -82,7 +82,9 @@ export const handler = async (
           QueueUrl: process.env.RENDER_QUEUE_URL!,
           MessageBody: JSON.stringify({
             path: `${getPageRouterPath(request.uri)}${request.querystring ? `?${request.querystring}` : ''}`
-          })
+          }),
+          MessageGroupId: request.uri,
+          MessageDeduplicationId: Date.now().toString()
         })
       )
     }
