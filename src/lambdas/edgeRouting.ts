@@ -97,7 +97,7 @@ export const handler = async (
 
     if (isFileExists) {
       // Modify s3 path request
-      request.uri = `/${s3Key}${queryParams}`
+      request.uri = `/${s3Key}`
 
       // If file exists, allow the request to proceed to S3
       callback(null, request)

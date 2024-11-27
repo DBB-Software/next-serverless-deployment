@@ -41,13 +41,13 @@ export class S3Cache implements CacheStrategy {
     )
   }
 
-  async get(pageKey: string, cacheKey: string, ctx: CacheContext): Promise<CacheEntry | null> {
+  async get(pageKey: string, cacheKey: string): Promise<CacheEntry | null> {
     if (!this.client) return null
 
     const pageData = await this.client
       .getObject({
         Bucket: this.bucketName,
-        Key: `${pageKey}/${cacheKey}.${ctx.isAppRouter ? CacheExtension.RSC : CacheExtension.JSON}`
+        Key: `${pageKey}/${cacheKey}.${CacheExtension.JSON}`
       })
       .catch((error) => {
         if (NOT_FOUND_ERROR.includes(error.name)) return null
@@ -58,7 +58,7 @@ export class S3Cache implements CacheStrategy {
 
     const response = await pageData.Body.transformToString('utf-8')
 
-    return ctx.isAppRouter ? response : JSON.parse(response)
+    return JSON.parse(response)
   }
 
   async set(pageKey: string, cacheKey: string, data: CacheEntry, ctx: CacheContext): Promise<void> {
@@ -82,6 +82,14 @@ export class S3Cache implements CacheStrategy {
             ContentType: 'text/html'
           })
         )
+        promises.push(
+          this.client.putObject({
+            ...input,
+            Key: `${input.Key}.${CacheExtension.JSON}`,
+            Body: JSON.stringify(data),
+            ContentType: 'application/json'
+          })
+        )
         if (ctx.isAppRouter) {
           promises.push(
             this.client.putObject({
@@ -89,15 +97,6 @@ export class S3Cache implements CacheStrategy {
               Key: `${input.Key}.${CacheExtension.RSC}`,
               Body: data.value.pageData as string, // for server react components we need to safe additional reference data for nextjs.
               ContentType: 'text/x-component'
-            })
-          )
-        } else {
-          promises.push(
-            this.client.putObject({
-              ...input,
-              Key: `${input.Key}.${CacheExtension.JSON}`,
-              Body: JSON.stringify(data.value.pageData),
-              ContentType: 'application/json'
             })
           )
         }
