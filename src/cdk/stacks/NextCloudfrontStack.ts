@@ -5,6 +5,7 @@ import { RoutingLambdaEdge } from '../constructs/RoutingLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { CacheConfig } from '../../types'
 import { CheckExpirationLambdaEdge } from '../constructs/CheckExpirationLambdaEdge'
+import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -21,6 +22,7 @@ export interface NextCloudfrontStackProps extends StackProps {
 export class NextCloudfrontStack extends Stack {
   public readonly routingLambdaEdge: RoutingLambdaEdge
   public readonly checkExpLambdaEdge: CheckExpirationLambdaEdge
+  public readonly viewerResponseLambdaEdge: ViewerResponseLambdaEdge
   public readonly cloudfront: CloudFrontDistribution
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
@@ -55,6 +57,11 @@ export class NextCloudfrontStack extends Stack {
       region
     })
 
+    this.viewerResponseLambdaEdge = new ViewerResponseLambdaEdge(this, `${id}-ViewerResponseLambdaEdge`, {
+      nodejs,
+      buildOutputPath
+    })
+
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
       bucketName: staticBucketName,
       region
@@ -65,6 +72,7 @@ export class NextCloudfrontStack extends Stack {
       renderServerDomain,
       requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
       responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
+      viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
       cacheConfig,
       imageTTL
     })

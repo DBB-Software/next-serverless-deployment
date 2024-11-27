@@ -66,6 +66,9 @@ export class S3Cache implements CacheStrategy {
     const baseInput: PutObjectCommandInput = {
       Bucket: this.bucketName,
       Key: `${pageKey}/${cacheKey}`,
+      Metadata: {
+        'Cache-Fragment-Key': cacheKey
+      },
       ...(data.revalidate ? { CacheControl: `max-age=${data.revalidate}` } : undefined)
     }
 

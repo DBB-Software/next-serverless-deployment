@@ -12,6 +12,7 @@ interface CloudFrontPropsDistribution {
   renderServerDomain: string
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
   responseEdgeFunction: cloudfront.experimental.EdgeFunction
+  viewerResponseEdgeFunction: cloudfront.experimental.EdgeFunction
   cacheConfig: CacheConfig
   imageTTL?: number
 }
@@ -29,7 +30,15 @@ export class CloudFrontDistribution extends Construct {
   constructor(scope: Construct, id: string, props: CloudFrontPropsDistribution) {
     super(scope, id)
 
-    const { staticBucket, requestEdgeFunction, responseEdgeFunction, cacheConfig, renderServerDomain, imageTTL } = props
+    const {
+      staticBucket,
+      requestEdgeFunction,
+      responseEdgeFunction,
+      viewerResponseEdgeFunction,
+      cacheConfig,
+      renderServerDomain,
+      imageTTL
+    } = props
 
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
       cachePolicyName: `${id}-SplitCachePolicy`,
@@ -86,6 +95,10 @@ export class CloudFrontDistribution extends Construct {
           {
             functionVersion: responseEdgeFunction.currentVersion,
             eventType: cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE
+          },
+          {
+            functionVersion: viewerResponseEdgeFunction.currentVersion,
+            eventType: cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE
           }
         ],
         cachePolicy: splitCachePolicy
