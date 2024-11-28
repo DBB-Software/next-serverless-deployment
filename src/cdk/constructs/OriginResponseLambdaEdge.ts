@@ -8,7 +8,7 @@ import path from 'node:path'
 import { buildLambda } from '../../build/edge'
 import { CacheConfig } from '../../types'
 
-interface CheckExpirationLambdaEdgeProps extends cdk.StackProps {
+interface OriginResponseLambdaEdgeProps extends cdk.StackProps {
   renderWorkerQueueUrl: string
   renderWorkerQueueArn: string
   buildOutputPath: string
@@ -22,15 +22,15 @@ const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
   '20': lambda.Runtime.NODEJS_20_X
 }
 
-export class CheckExpirationLambdaEdge extends Construct {
+export class OriginResponseLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
-  constructor(scope: Construct, id: string, props: CheckExpirationLambdaEdgeProps) {
+  constructor(scope: Construct, id: string, props: OriginResponseLambdaEdgeProps) {
     const { nodejs, buildOutputPath, cacheConfig, renderWorkerQueueUrl, renderWorkerQueueArn, region } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
-    const name = 'checkExpiration'
+    const name = 'originResponse'
 
     buildLambda(name, buildOutputPath, {
       define: {
@@ -40,13 +40,13 @@ export class CheckExpirationLambdaEdge extends Construct {
       }
     })
 
-    const logGroup = new logs.LogGroup(this, 'CheckExpirationLambdaEdgeLogGroup', {
-      logGroupName: `/aws/lambda/${id}-checkExpiration`,
+    const logGroup = new logs.LogGroup(this, 'OriginResponseLambdaEdgeLogGroup', {
+      logGroupName: `/aws/lambda/${id}-originResponse`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.ONE_DAY
     })
 
-    this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'CheckExpirationLambdaEdge', {
+    this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'OriginResponseLambdaEdge', {
       runtime: nodeJSEnvironment,
       code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', name)),
       handler: 'index.handler',
