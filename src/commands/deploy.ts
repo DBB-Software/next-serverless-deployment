@@ -1,6 +1,7 @@
 import { ElasticBeanstalk } from '@aws-sdk/client-elastic-beanstalk'
 import { S3 } from '@aws-sdk/client-s3'
 import { CloudFront } from '@aws-sdk/client-cloudfront'
+import type { NextConfig } from 'next/types'
 import fs from 'node:fs'
 import childProcess from 'node:child_process'
 import path from 'node:path'
@@ -83,7 +84,8 @@ export const deploy = async (config: DeployConfig) => {
 
     const cacheConfig = await loadConfig()
 
-    const nextConfig = await loadFile(projectSettings.nextConfigPath)
+    const nextConfig = (await loadFile(projectSettings.nextConfigPath)) as NextConfig
+    const nextRedirects = nextConfig.redirects ? await nextConfig.redirects() : undefined
 
     const outputPath = createOutputFolder()
 
@@ -148,6 +150,7 @@ export const deploy = async (config: DeployConfig) => {
         region,
         cacheConfig,
         imageTTL: nextConfig.imageTTL,
+        redirects: nextRedirects,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }

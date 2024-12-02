@@ -3,9 +3,10 @@ import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import { OriginRequestLambdaEdge } from '../constructs/OriginRequestLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
-import { CacheConfig } from '../../types'
 import { OriginResponseLambdaEdge } from '../constructs/OriginResponseLambdaEdge'
 import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
+import { ViewerRequestLambdaEdge } from '../constructs/ViewerRequestLambdaEdge'
+import { CacheConfig, NextRedirects } from '../../types'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -17,12 +18,14 @@ export interface NextCloudfrontStackProps extends StackProps {
   buildOutputPath: string
   cacheConfig: CacheConfig
   imageTTL?: number
+  redirects?: NextRedirects
 }
 
 export class NextCloudfrontStack extends Stack {
   public readonly originRequestLambdaEdge: OriginRequestLambdaEdge
   public readonly originResponseLambdaEdge: OriginResponseLambdaEdge
   public readonly viewerResponseLambdaEdge: ViewerResponseLambdaEdge
+  public readonly viewerRequestLambdaEdge: ViewerRequestLambdaEdge
   public readonly cloudfront: CloudFrontDistribution
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
@@ -36,7 +39,8 @@ export class NextCloudfrontStack extends Stack {
       renderWorkerQueueArn,
       region,
       cacheConfig,
-      imageTTL
+      imageTTL,
+      redirects
     } = props
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
@@ -57,6 +61,12 @@ export class NextCloudfrontStack extends Stack {
       region
     })
 
+    this.viewerRequestLambdaEdge = new ViewerRequestLambdaEdge(this, `${id}-ViewerRequestLambdaEdge`, {
+      buildOutputPath,
+      nodejs,
+      redirects
+    })
+
     this.viewerResponseLambdaEdge = new ViewerResponseLambdaEdge(this, `${id}-ViewerResponseLambdaEdge`, {
       nodejs,
       buildOutputPath
@@ -73,6 +83,7 @@ export class NextCloudfrontStack extends Stack {
       requestEdgeFunction: this.originRequestLambdaEdge.lambdaEdge,
       responseEdgeFunction: this.originResponseLambdaEdge.lambdaEdge,
       viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
+      viewerRequestLambdaEdge: this.viewerRequestLambdaEdge.lambdaEdge,
       cacheConfig,
       imageTTL
     })
