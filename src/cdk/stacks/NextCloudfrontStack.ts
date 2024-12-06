@@ -6,7 +6,7 @@ import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { OriginResponseLambdaEdge } from '../constructs/OriginResponseLambdaEdge'
 import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
 import { ViewerRequestLambdaEdge } from '../constructs/ViewerRequestLambdaEdge'
-import { CacheConfig, NextRedirects } from '../../types'
+import { DeployConfig, NextRedirects } from '../../types'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -16,9 +16,10 @@ export interface NextCloudfrontStackProps extends StackProps {
   renderWorkerQueueUrl: string
   renderWorkerQueueArn: string
   buildOutputPath: string
-  cacheConfig: CacheConfig
+  deployConfig: DeployConfig
   imageTTL?: number
   redirects?: NextRedirects
+  trailingSlash?: boolean
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -38,9 +39,10 @@ export class NextCloudfrontStack extends Stack {
       renderWorkerQueueUrl,
       renderWorkerQueueArn,
       region,
-      cacheConfig,
+      deployConfig,
       imageTTL,
-      redirects
+      redirects,
+      trailingSlash = false
     } = props
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
@@ -48,7 +50,7 @@ export class NextCloudfrontStack extends Stack {
       bucketName: staticBucketName,
       renderServerDomain,
       buildOutputPath,
-      cacheConfig,
+      cacheConfig: deployConfig.cache,
       bucketRegion: region
     })
 
@@ -56,7 +58,7 @@ export class NextCloudfrontStack extends Stack {
       nodejs,
       renderWorkerQueueUrl,
       buildOutputPath,
-      cacheConfig,
+      cacheConfig: deployConfig.cache,
       renderWorkerQueueArn,
       region
     })
@@ -64,7 +66,9 @@ export class NextCloudfrontStack extends Stack {
     this.viewerRequestLambdaEdge = new ViewerRequestLambdaEdge(this, `${id}-ViewerRequestLambdaEdge`, {
       buildOutputPath,
       nodejs,
-      redirects
+      redirects,
+      internationalizationConfig: deployConfig.internationalization,
+      trailingSlash
     })
 
     this.viewerResponseLambdaEdge = new ViewerResponseLambdaEdge(this, `${id}-ViewerResponseLambdaEdge`, {
@@ -84,7 +88,7 @@ export class NextCloudfrontStack extends Stack {
       responseEdgeFunction: this.originResponseLambdaEdge.lambdaEdge,
       viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
       viewerRequestLambdaEdge: this.viewerRequestLambdaEdge.lambdaEdge,
-      cacheConfig,
+      cacheConfig: deployConfig.cache,
       imageTTL
     })
 

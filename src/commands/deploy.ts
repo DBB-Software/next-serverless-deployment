@@ -82,7 +82,7 @@ export const deploy = async (config: DeployConfig) => {
       throw new Error('Was not able to find project settings.')
     }
 
-    const cacheConfig = await loadConfig()
+    const deployConfig = await loadConfig()
 
     const nextConfig = (await loadFile(projectSettings.nextConfigPath)) as NextConfig
     const nextRedirects = nextConfig.redirects ? await nextConfig.redirects() : undefined
@@ -148,8 +148,9 @@ export const deploy = async (config: DeployConfig) => {
         buildOutputPath: outputPath,
         crossRegionReferences: true,
         region,
-        cacheConfig,
+        deployConfig,
         imageTTL: nextConfig.imageTTL,
+        trailingSlash: nextConfig.trailingSlash,
         redirects: nextRedirects,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.

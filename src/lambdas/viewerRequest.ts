@@ -1,5 +1,6 @@
 import type { CloudFrontRequestCallback, Context, CloudFrontResponseEvent } from 'aws-lambda'
-import type { NextRedirects } from '../types'
+import type { NextRedirects, DeployConfig } from '../types'
+import path from 'node:path'
 
 /**
  * AWS Lambda@Edge Viewer Request handler for Next.js redirects
@@ -17,14 +18,53 @@ export const handler = async (
 ) => {
   const request = event.Records[0].cf.request
   const redirectsConfig = process.env.REDIRECTS as unknown as NextRedirects
+  const localesConfig = process.env.LOCALES_CONFIG as unknown as DeployConfig['internationalization'] | null
+  const isTrailingSlash = process.env.IS_TRAILING_SLASH as unknown as boolean
+  const pathHasTrailingSlash = request.uri.endsWith('/')
 
-  const redirect = redirectsConfig.find((r) => r.source === request.uri)
+  if (pathHasTrailingSlash && !isTrailingSlash) {
+    request.uri = request.uri.slice(0, -1)
+  } else if (!pathHasTrailingSlash && isTrailingSlash) {
+    request.uri += '/'
+  }
+
+  let shouldRedirectWithLocale = false
+  let pagePath = request.uri
+  let locale = ''
+  let redirectTo = ''
+  let redirectStatus = '307'
+
+  if (localesConfig) {
+    const [requestLocale, ...restPath] = request.uri.substring(1).split('/')
+    shouldRedirectWithLocale = !localesConfig.locales.find((locale) => locale === requestLocale)
+
+    if (!shouldRedirectWithLocale) {
+      pagePath = `/${restPath.join('/')}`
+      locale = requestLocale
+    } else {
+      locale = localesConfig.defaultLocale
+    }
+  }
+
+  const redirect = redirectsConfig.find((r) => r.source === pagePath)
 
   if (redirect) {
+    redirectTo = locale ? `/${path.join(locale, redirect.destination)}` : redirect.destination
+    redirectStatus = redirect.statusCode ? String(redirect.statusCode) : redirect.permanent ? '308' : '307'
+  } else if (shouldRedirectWithLocale) {
+    redirectTo = `/${path.join(locale, pagePath)}`
+  }
+
+  if (redirectTo) {
     return callback(null, {
-      status: redirect.statusCode ? String(redirect.statusCode) : redirect.permanent ? '308' : '307',
+      status: redirectStatus,
       headers: {
-        location: [{ key: 'Location', value: redirect.destination }]
+        location: [
+          {
+            key: 'Location',
+            value: `${redirectTo}${request.querystring ? `?${request.querystring}` : ''}`
+          }
+        ]
       }
     })
   }
