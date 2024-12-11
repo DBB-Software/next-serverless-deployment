@@ -1,45 +1,6 @@
-import http, { type RequestOptions } from 'http'
+import { type RequestOptions } from 'http'
 import type { CloudFrontRequest } from 'aws-lambda'
 import { HEADER_DEVICE_TYPE } from '../../constants'
-
-/**
- * Makes an HTTP request with the given options and returns a promise with the response
- * @param {RequestOptions & { body?: string }} options - HTTP request options including optional body
- * @returns {Promise<{body: string, statusCode?: number, statusMessage?: string}>} Response object containing body, status code and message
- */
-export async function makeHTTPRequest(options: RequestOptions & { body?: string }): Promise<{
-  body: string
-  statusCode?: number
-  statusMessage?: string
-}> {
-  return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
-      let data = ''
-
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-
-      res.on('end', () => {
-        resolve({
-          body: data,
-          statusCode: res.statusCode,
-          statusMessage: res.statusMessage
-        })
-      })
-    })
-
-    if (options.body) {
-      req.write(options.body)
-    }
-
-    req.on('error', (e) => {
-      reject(e)
-    })
-
-    req.end()
-  })
-}
 
 /**
  * Converts CloudFront headers to standard HTTP request headers

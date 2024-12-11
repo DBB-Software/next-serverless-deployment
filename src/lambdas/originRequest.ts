@@ -3,8 +3,6 @@ import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontReque
 import crypto from 'node:crypto'
 import { CacheConfig } from '../types'
 import {
-  makeHTTPRequest,
-  convertCloudFrontHeaders,
   transformQueryToObject,
   transformCookiesToObject,
   getCurrentDeviceType,
@@ -86,14 +84,15 @@ export const handler = async (
   const request = event.Records[0].cf.request
   const s3Bucket = process.env.S3_BUCKET!
   const cacheConfig = process.env.CACHE_CONFIG as CacheConfig
+  const nextCachedRoutesMatchers = process.env.NEXT_CACHED_ROUTES_MATCHERS as unknown as string[]
   const { s3Key } = getS3ObjectPath(request, cacheConfig)
   const ebAppUrl = process.env.EB_APP_URL!
-  const originalUri = request.uri
-  const queryParams = request.querystring ? `?${request.querystring}` : ''
+
+  const isCachedRoute = nextCachedRoutesMatchers.some((matcher) => RegExp(matcher).test(request.uri))
 
   try {
-    // Check if file exists in S3
-    const isFileExists = await checkFileExistsInS3(s3Bucket, s3Key)
+    // Check if file exists in S3 when route accepts caching.
+    const isFileExists = isCachedRoute ? await checkFileExistsInS3(s3Bucket, s3Key) : false
 
     if (isFileExists) {
       // Modify s3 path request
@@ -102,20 +101,21 @@ export const handler = async (
       // If file exists, allow the request to proceed to S3
       callback(null, request)
     } else {
-      const options = {
-        hostname: ebAppUrl,
-        path: `${originalUri}${queryParams}`,
-        method: request.method,
-        headers: convertCloudFrontHeaders(request.headers)
+      request.origin = {
+        custom: {
+          domainName: ebAppUrl,
+          port: 80,
+          protocol: 'http',
+          path: '',
+          keepaliveTimeout: 5,
+          readTimeout: 30,
+          customHeaders: {},
+          sslProtocols: ['TLSv1.2']
+        }
       }
 
-      const { body, statusCode, statusMessage } = await makeHTTPRequest(options)
-
-      callback(null, {
-        status: statusCode?.toString() || '500',
-        statusDescription: statusMessage || 'Internal Server Error',
-        body
-      })
+      request.headers['host'] = [{ key: 'host', value: ebAppUrl }]
+      callback(null, request)
     }
   } catch (_e) {
     const error = _e as Error

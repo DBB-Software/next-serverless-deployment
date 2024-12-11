@@ -111,6 +111,14 @@ export const deploy = async (config: DeployConfig) => {
     }
     const siteNameLowerCased = siteName.toLowerCase()
 
+    // Build and zip app.
+    const { cleanNextApp: cleanAppBuild, nextCachedRoutesMatchers } = await buildApp({
+      projectSettings,
+      outputPath
+    })
+
+    cleanNextApp = cleanAppBuild
+
     const nextRenderServerStack = new AppStack<NextRenderServerStack, NextRenderServerStackProps>(
       `${siteNameLowerCased}-server`,
       NextRenderServerStack,
@@ -152,19 +160,13 @@ export const deploy = async (config: DeployConfig) => {
         imageTTL: nextConfig.imageTTL,
         trailingSlash: nextConfig.trailingSlash,
         redirects: nextRedirects,
+        nextCachedRoutesMatchers,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }
       }
     )
     const nextCloudfrontStackOutput = await nextCloudfrontStack.deployStack()
-
-    // Build and zip app.
-    cleanNextApp = await buildApp({
-      projectSettings,
-      outputPath,
-      s3BucketName: nextRenderServerStackOutput.StaticBucketName
-    })
 
     const now = Date.now()
     const archivedFolderName = `${OUTPUT_FOLDER}-server-v${now}.zip`

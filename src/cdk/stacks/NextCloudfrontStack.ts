@@ -20,6 +20,7 @@ export interface NextCloudfrontStackProps extends StackProps {
   imageTTL?: number
   redirects?: NextRedirects
   trailingSlash?: boolean
+  nextCachedRoutesMatchers: string[]
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -42,7 +43,8 @@ export class NextCloudfrontStack extends Stack {
       deployConfig,
       imageTTL,
       redirects,
-      trailingSlash = false
+      trailingSlash = false,
+      nextCachedRoutesMatchers
     } = props
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
@@ -51,7 +53,8 @@ export class NextCloudfrontStack extends Stack {
       renderServerDomain,
       buildOutputPath,
       cacheConfig: deployConfig.cache,
-      bucketRegion: region
+      bucketRegion: region,
+      nextCachedRoutesMatchers
     })
 
     this.originResponseLambdaEdge = new OriginResponseLambdaEdge(this, `${id}-OriginResponseLambdaEdge`, {
