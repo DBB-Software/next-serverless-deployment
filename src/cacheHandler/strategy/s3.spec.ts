@@ -165,7 +165,7 @@ describe('S3Cache', () => {
 
     expect(await s3Cache.get(cacheKey, cacheKey)).toEqual(mockCacheEntryWithTags.value.pageData)
 
-    await s3Cache.revalidateTag(cacheKey, [])
+    await s3Cache.revalidateTag(cacheKey)
 
     expect(await s3Cache.get(cacheKey, cacheKey)).toBeNull()
   })

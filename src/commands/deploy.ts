@@ -12,6 +12,7 @@ import { getAWSCredentials, uploadFolderToS3, uploadFileToS3, AWS_EDGE_REGION, e
 import { AppStack } from '../common/cdk'
 import { getProjectSettings, loadFile } from '../common/project'
 import loadConfig from './helpers/loadConfig'
+import { buildRevalidateServer } from '../common/esbuild'
 
 export interface DeployConfig {
   siteName: string
@@ -55,7 +56,6 @@ const createOutputFolder = () => {
 }
 
 export const deploy = async (config: DeployConfig) => {
-  let cleanNextApp
   try {
     const {
       siteName,
@@ -112,12 +112,10 @@ export const deploy = async (config: DeployConfig) => {
     const siteNameLowerCased = siteName.toLowerCase()
 
     // Build and zip app.
-    const { cleanNextApp: cleanAppBuild, nextCachedRoutesMatchers } = await buildApp({
+    const { nextCachedRoutesMatchers } = await buildApp({
       projectSettings,
       outputPath
     })
-
-    cleanNextApp = cleanAppBuild
 
     const nextRenderServerStack = new AppStack<NextRenderServerStack, NextRenderServerStackProps>(
       `${siteNameLowerCased}-server`,
@@ -169,8 +167,10 @@ export const deploy = async (config: DeployConfig) => {
     const nextCloudfrontStackOutput = await nextCloudfrontStack.deployStack()
 
     const now = Date.now()
-    const archivedFolderName = `${OUTPUT_FOLDER}-server-v${now}.zip`
-    const buildOutputPathArchived = path.join(outputPath, archivedFolderName)
+    const archivedRenderServerFolderName = `${OUTPUT_FOLDER}-render-server-v${now}.zip`
+    const buildOutputRenderServerPathArchived = path.join(outputPath, archivedRenderServerFolderName)
+    const archivedRenderWorkerFolderName = `${OUTPUT_FOLDER}-worker-server-v${now}.zip`
+    const buildOutputRenderWorkerPathArchived = path.join(outputPath, archivedRenderWorkerFolderName)
     const versionLabel = `${OUTPUT_FOLDER}-server-v${now}`
 
     fs.writeFileSync(
@@ -179,7 +179,21 @@ export const deploy = async (config: DeployConfig) => {
     )
 
     childProcess.execSync(
-      `cd ${path.join(outputPath, '.next', 'standalone')} && zip -r ../../${archivedFolderName} \\.* *`,
+      `cd ${path.join(outputPath, '.next', 'standalone')} && zip -r ../../${archivedRenderServerFolderName} \\.* *`,
+      {
+        stdio: 'inherit'
+      }
+    )
+
+    buildRevalidateServer('revalidateServer', path.join(outputPath, '.next'))
+
+    fs.writeFileSync(
+      path.join(outputPath, '.next', 'Procfile'),
+      `web: node ./next-handlers/revalidateServer.js & PORT=3001 node ${path.join(path.relative(projectSettings.root, projectSettings.projectPath), 'server.js')}`
+    )
+
+    childProcess.execSync(
+      `cd ${path.join(outputPath, '.next', 'standalone')} && zip -r ../../${archivedRenderWorkerFolderName} \\.* *`,
       {
         stdio: 'inherit'
       }
@@ -198,7 +212,7 @@ export const deploy = async (config: DeployConfig) => {
     await uploadFileToS3(s3Client, {
       Bucket: nextRenderServerStackOutput.RenderServerVersionsBucketName,
       Key: `${versionLabel}.zip`,
-      Body: fs.readFileSync(buildOutputPathArchived)
+      Body: fs.readFileSync(buildOutputRenderServerPathArchived)
     })
 
     await ebClient.createApplicationVersion({
@@ -220,7 +234,7 @@ export const deploy = async (config: DeployConfig) => {
     await uploadFileToS3(s3Client, {
       Bucket: nextRenderServerStackOutput.RenderWorkerVersionsBucketName,
       Key: `${versionLabel}.zip`,
-      Body: fs.readFileSync(buildOutputPathArchived)
+      Body: fs.readFileSync(buildOutputRenderWorkerPathArchived)
     })
 
     await ebClient.createApplicationVersion({
@@ -252,6 +266,5 @@ export const deploy = async (config: DeployConfig) => {
     console.error('Failed to deploy:', err)
   } finally {
     cleanOutputFolder()
-    await cleanNextApp?.()
   }
 }

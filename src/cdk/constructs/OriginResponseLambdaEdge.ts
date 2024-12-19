@@ -5,7 +5,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as logs from 'aws-cdk-lib/aws-logs'
 import path from 'node:path'
-import { buildLambda } from '../../build/edge'
+import { buildLambda } from '../../common/esbuild'
 import { CacheConfig } from '../../types'
 
 interface OriginResponseLambdaEdgeProps extends cdk.StackProps {

@@ -39,6 +39,8 @@ interface RenderWorkerProps {
   minInstances?: number
   /** Maximum number of instances in the Auto Scaling group. Defaults to 2 */
   maxInstances?: number
+  /** Name of the DynamoDB table used for caching */
+  dynamoDBCacheTable: string
 }
 
 /**
@@ -57,6 +59,8 @@ export class RenderWorkerDistribution extends Construct {
   public readonly versionsBucket: s3.Bucket
   /** IAM instance profile for EC2 instances */
   public readonly instanceProfile: iam.CfnInstanceProfile
+  /** IAM role attached to EC2 instances in the worker environment */
+  public readonly instanceRole: iam.Role
   /** VPC where the worker environment will be deployed */
   public readonly vpc: Vpc
   /** Security group for the worker environment */
@@ -85,7 +89,8 @@ export class RenderWorkerDistribution extends Construct {
       appName,
       instanceType = 't2.micro',
       minInstances = 1,
-      maxInstances = 2
+      maxInstances = 2,
+      dynamoDBCacheTable
     } = props
 
     /**
@@ -147,7 +152,7 @@ export class RenderWorkerDistribution extends Construct {
      * Create IAM role for EC2 instances
      * Includes required permissions for Elastic Beanstalk Worker tier
      */
-    const instanceRole = new iam.Role(this, 'WorkerInstanceRole', {
+    this.instanceRole = new iam.Role(this, 'WorkerInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkWorkerTier')]
     })
@@ -155,7 +160,7 @@ export class RenderWorkerDistribution extends Construct {
     /**
      * Add S3 permissions for static asset access
      */
-    instanceRole.addToPolicy(
+    this.instanceRole.addToPolicy(
       new iam.PolicyStatement({
         actions: ['s3:Get*', 's3:Put*', 's3:Delete*', 's3:ListBucket'],
         resources: [staticS3Bucket.bucketArn, `${staticS3Bucket.bucketArn}/*`]
@@ -165,7 +170,7 @@ export class RenderWorkerDistribution extends Construct {
     /**
      * Add SQS permissions for queue operations
      */
-    instanceRole.addToPolicy(
+    this.instanceRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [
           'sqs:ChangeMessageVisibility',
@@ -183,7 +188,7 @@ export class RenderWorkerDistribution extends Construct {
      * Create Instance Profile for EC2 instances
      */
     this.instanceProfile = new iam.CfnInstanceProfile(this, 'WorkerInstanceProfile', {
-      roles: [instanceRole.roleName]
+      roles: [this.instanceRole.roleName]
     })
 
     /**
@@ -222,7 +227,7 @@ export class RenderWorkerDistribution extends Construct {
         {
           namespace: 'aws:elasticbeanstalk:application:environment',
           optionName: 'PORT',
-          value: '8080'
+          value: '3000'
         },
         {
           namespace: 'aws:elasticbeanstalk:application:environment',
@@ -233,6 +238,11 @@ export class RenderWorkerDistribution extends Construct {
           namespace: 'aws:elasticbeanstalk:application:environment',
           optionName: 'STATIC_BUCKET_NAME',
           value: staticS3Bucket.bucketName
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:application:environment',
+          optionName: 'DYNAMODB_CACHE_TABLE',
+          value: dynamoDBCacheTable
         },
         {
           namespace: 'aws:elasticbeanstalk:application:environment',
@@ -280,7 +290,7 @@ export class RenderWorkerDistribution extends Construct {
         {
           namespace: 'aws:elasticbeanstalk:sqsd',
           optionName: 'HttpPath',
-          value: '/api/revalidate'
+          value: '/api/revalidate-pages'
         },
         {
           namespace: 'aws:elasticbeanstalk:sqsd',

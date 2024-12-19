@@ -1,6 +1,6 @@
 import { NEXT_CACHE_TAGS_HEADER } from 'next/dist/lib/constants'
-import { ListObjectsV2CommandOutput, S3 } from '@aws-sdk/client-s3'
-import { PutObjectCommandInput } from '@aws-sdk/client-s3/dist-types/commands/PutObjectCommand'
+import { type ListObjectsV2CommandOutput, type PutObjectCommandInput, S3 } from '@aws-sdk/client-s3'
+import { DynamoDB } from '@aws-sdk/client-dynamodb'
 import { chunkArray } from '../../common/array'
 import type { CacheEntry, CacheStrategy, CacheContext } from '@dbbs/next-cache-handler-core'
 
@@ -13,16 +13,17 @@ enum CacheExtension {
 }
 const PAGE_CACHE_EXTENSIONS = Object.values(CacheExtension)
 const CHUNK_LIMIT = 1000
-const EXT_REGEX = new RegExp(`.(${PAGE_CACHE_EXTENSIONS.join('|')})$`)
 
 export class S3Cache implements CacheStrategy {
   public readonly client: S3
   public readonly bucketName: string
+  #dynamoDBClient: DynamoDB
 
   constructor(bucketName: string) {
     const region = process.env.AWS_REGION
     this.client = new S3({ region })
     this.bucketName = bucketName
+    this.#dynamoDBClient = new DynamoDB({ region })
   }
 
   buildTagKeys(tags?: string | string[]) {
@@ -69,12 +70,25 @@ export class S3Cache implements CacheStrategy {
       Metadata: {
         'Cache-Fragment-Key': cacheKey
       },
-      ...(data.revalidate ? { CacheControl: `max-age=${data.revalidate}` } : undefined)
+      ...(data.revalidate ? { CacheControl: `smax-age=${data.revalidate}, stale-while-revalidate` } : undefined)
     }
 
     if (data.value?.kind === 'PAGE' || data.value?.kind === 'ROUTE') {
       const headersTags = this.buildTagKeys(data.value.headers?.[NEXT_CACHE_TAGS_HEADER]?.toString())
-      const input: PutObjectCommandInput = { ...baseInput, ...(headersTags ? { Tagging: headersTags } : {}) }
+      const input: PutObjectCommandInput = { ...baseInput }
+
+      promises.push(
+        this.#dynamoDBClient.putItem({
+          TableName: process.env.DYNAMODB_CACHE_TABLE!,
+          Item: {
+            pageKey: { S: pageKey },
+            cacheKey: { S: cacheKey },
+            s3Key: { S: baseInput.Key! },
+            tags: { S: [headersTags, this.buildTagKeys(data.tags)].filter(Boolean).join('&') },
+            createdAt: { S: new Date().toISOString() }
+          }
+        })
+      )
 
       if (data.value?.kind === 'PAGE') {
         promises.push(
@@ -119,8 +133,8 @@ export class S3Cache implements CacheStrategy {
           ...baseInput,
           Key: `${baseInput.Key}.${CacheExtension.JSON}`,
           Body: JSON.stringify(data),
-          ContentType: 'application/json',
-          ...(data.tags?.length ? { Tagging: `${this.buildTagKeys(data.tags)}` } : {})
+          ContentType: 'application/json'
+          // ...(data.tags?.length ? { Tagging: `${this.buildTagKeys(data.tags)}` } : {})
         })
       )
     }
@@ -128,9 +142,23 @@ export class S3Cache implements CacheStrategy {
     await Promise.all(promises)
   }
 
-  async revalidateTag(tag: string, allowCacheKeys: string[]): Promise<void> {
+  async revalidateTag(tag: string): Promise<void> {
     const keysToDelete: string[] = []
     let nextContinuationToken: string | undefined = undefined
+
+    const result = await this.#dynamoDBClient.query({
+      TableName: process.env.DYNAMODB_CACHE_TABLE!,
+      KeyConditionExpression: '#field = :value',
+      ExpressionAttributeNames: {
+        '#field': 'tags'
+      },
+      ExpressionAttributeValues: {
+        ':value': { S: tag }
+      }
+    })
+
+    console.log('HERE_IS_RESULT', result)
+    console.log('HERE_IS_RESULT_ITEMS', result.Items)
     do {
       const { Contents: contents = [], NextContinuationToken: token }: ListObjectsV2CommandOutput =
         await this.client.listObjectsV2({
@@ -141,11 +169,9 @@ export class S3Cache implements CacheStrategy {
 
       keysToDelete.push(
         ...(await contents.reduce<Promise<string[]>>(async (acc, { Key: key }) => {
-          if (
-            !key ||
-            (allowCacheKeys.length && !allowCacheKeys.some((allowKey) => key.replace(EXT_REGEX, '').endsWith(allowKey)))
-          )
+          if (!key) {
             return acc
+          }
 
           const { TagSet = [] } = await this.client.getObjectTagging({ Bucket: this.bucketName, Key: key })
           const tags = TagSet.filter(({ Key: key }) => key?.startsWith(TAG_PREFIX)).map(({ Value: tags }) => tags || '')
@@ -163,6 +189,7 @@ export class S3Cache implements CacheStrategy {
   }
 
   async delete(pageKey: string, cacheKey: string): Promise<void> {
+    console.log('HERE_IS_CALL_DELETE')
     await this.client.deleteObjects({
       Bucket: this.bucketName,
       Delete: { Objects: PAGE_CACHE_EXTENSIONS.map((ext) => ({ Key: `${pageKey}/${cacheKey}.${ext}` })) }
@@ -172,6 +199,17 @@ export class S3Cache implements CacheStrategy {
   async deleteAllByKeyMatch(pageKey: string, cacheKey: string): Promise<void> {
     if (cacheKey) {
       await this.deleteObjects(PAGE_CACHE_EXTENSIONS.map((ext) => `${pageKey}/${cacheKey}.${ext}`))
+      await this.#dynamoDBClient.deleteItem({
+        TableName: process.env.DYNAMODB_CACHE_TABLE!,
+        Key: {
+          pageKey: {
+            S: pageKey
+          },
+          cacheKey: {
+            S: cacheKey
+          }
+        }
+      })
       return
     }
     const keysToDelete: string[] = []
