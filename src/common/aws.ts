@@ -69,17 +69,17 @@ export const uploadFileToS3 = async (s3Client: S3, options: PutObjectCommandInpu
 
 export const uploadFolderToS3 = async (s3Client: S3, options: S3UploadFolderOptions) => {
   const { folderRootPath, Key, ...s3UploadOptions } = options
-  const files = fs.readdirSync(path.join(folderRootPath, Key))
+  const files = fs.readdirSync(folderRootPath)
 
   for (const file of files) {
-    const filePath = path.join(folderRootPath, Key, file)
+    const filePath = path.join(folderRootPath, file)
     const s3FilePath = path.join(Key, file)
 
     if (fs.lstatSync(filePath).isDirectory()) {
       await uploadFolderToS3(s3Client, {
         ...s3UploadOptions,
         Key: s3FilePath,
-        folderRootPath
+        folderRootPath: filePath
       })
     } else {
       await uploadFileToS3(s3Client, {

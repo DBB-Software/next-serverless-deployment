@@ -4,10 +4,7 @@
   "description": "",
   "main": "./dist/index.js",
   "bin": {
-    "@dbbs/next-serverless-deployment": "./dist/index.js"
-  },
-  "exports": {
-    "./*": "./dist/*"
+    "@dbbs/next-serverless-deployment": "./dist/commands/index.js"
   },
   "types": "dist/types/index.d.ts",
   "files": [

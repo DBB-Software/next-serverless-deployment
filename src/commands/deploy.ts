@@ -168,21 +168,24 @@ export const deploy = async (config: DeployConfig) => {
     const versionLabel = `${OUTPUT_FOLDER}-server-v${now}`
 
     fs.writeFileSync(
-      path.join(outputPath, 'server', 'Procfile'),
+      path.join(outputPath, '.next', 'Procfile'),
       `web: node ${path.join(path.relative(projectSettings.root, projectSettings.projectPath), 'server.js')}`
     )
 
-    childProcess.execSync(`cd ${path.join(outputPath, 'server')} && zip -r ../${archivedFolderName} \\.* *`, {
-      stdio: 'inherit'
-    })
+    childProcess.execSync(
+      `cd ${path.join(outputPath, '.next', 'standalone')} && zip -r ../../${archivedFolderName} \\.* *`,
+      {
+        stdio: 'inherit'
+      }
+    )
 
     // prune static bucket before upload
     await emptyBucket(s3Client, nextRenderServerStackOutput.StaticBucketName)
 
     await uploadFolderToS3(s3Client, {
       Bucket: nextRenderServerStackOutput.StaticBucketName,
-      Key: '_next',
-      folderRootPath: outputPath
+      Key: '_next/static',
+      folderRootPath: path.join(outputPath, '.next', 'static')
     })
 
     // upload code version to bucket.
