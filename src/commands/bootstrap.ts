@@ -11,9 +11,9 @@ interface BootstrapProps {
   profile?: string
 }
 
-const runTask = (command: string, env: Record<string, string | undefined>) => {
+const runTask = (command: string, env: NodeJS.ProcessEnv) => {
   const task = childProcess.spawn(command, {
-    env: env,
+    env,
     shell: true,
     stdio: 'pipe'
   })

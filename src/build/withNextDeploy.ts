@@ -1,4 +1,4 @@
-import type { NextConfig } from 'next/dist/server/config-shared'
+import type { NextConfig } from 'next/types'
 import path from 'node:path'
 import loadConfig from '../commands/helpers/loadConfig'
 

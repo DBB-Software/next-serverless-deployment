@@ -13,6 +13,7 @@ interface CloudFrontPropsDistribution {
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
   responseEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerResponseEdgeFunction: cloudfront.experimental.EdgeFunction
+  viewerRequestLambdaEdge: cloudfront.experimental.EdgeFunction
   cacheConfig: CacheConfig
   imageTTL?: number
 }
@@ -35,6 +36,7 @@ export class CloudFrontDistribution extends Construct {
       requestEdgeFunction,
       responseEdgeFunction,
       viewerResponseEdgeFunction,
+      viewerRequestLambdaEdge,
       cacheConfig,
       renderServerDomain,
       imageTTL
@@ -99,6 +101,10 @@ export class CloudFrontDistribution extends Construct {
           {
             functionVersion: viewerResponseEdgeFunction.currentVersion,
             eventType: cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE
+          },
+          {
+            functionVersion: viewerRequestLambdaEdge.currentVersion,
+            eventType: cloudfront.LambdaEdgeEventType.VIEWER_REQUEST
           }
         ],
         cachePolicy: splitCachePolicy
