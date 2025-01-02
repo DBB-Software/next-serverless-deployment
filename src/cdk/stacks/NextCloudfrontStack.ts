@@ -1,10 +1,11 @@
 import { Stack, type StackProps } from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
-import { RoutingLambdaEdge } from '../constructs/RoutingLambdaEdge'
+import { OriginRequestLambdaEdge } from '../constructs/OriginRequestLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { CacheConfig } from '../../types'
-import { CheckExpirationLambdaEdge } from '../constructs/CheckExpirationLambdaEdge'
+import { OriginResponseLambdaEdge } from '../constructs/OriginResponseLambdaEdge'
+import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -19,8 +20,9 @@ export interface NextCloudfrontStackProps extends StackProps {
 }
 
 export class NextCloudfrontStack extends Stack {
-  public readonly routingLambdaEdge: RoutingLambdaEdge
-  public readonly checkExpLambdaEdge: CheckExpirationLambdaEdge
+  public readonly originRequestLambdaEdge: OriginRequestLambdaEdge
+  public readonly originResponseLambdaEdge: OriginResponseLambdaEdge
+  public readonly viewerResponseLambdaEdge: ViewerResponseLambdaEdge
   public readonly cloudfront: CloudFrontDistribution
 
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
@@ -37,7 +39,7 @@ export class NextCloudfrontStack extends Stack {
       imageTTL
     } = props
 
-    this.routingLambdaEdge = new RoutingLambdaEdge(this, `${id}-RoutingLambdaEdge`, {
+    this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
       renderServerDomain,
@@ -46,13 +48,18 @@ export class NextCloudfrontStack extends Stack {
       bucketRegion: region
     })
 
-    this.checkExpLambdaEdge = new CheckExpirationLambdaEdge(this, `${id}-CheckExpirationLambdaEdge`, {
+    this.originResponseLambdaEdge = new OriginResponseLambdaEdge(this, `${id}-OriginResponseLambdaEdge`, {
       nodejs,
       renderWorkerQueueUrl,
       buildOutputPath,
       cacheConfig,
       renderWorkerQueueArn,
       region
+    })
+
+    this.viewerResponseLambdaEdge = new ViewerResponseLambdaEdge(this, `${id}-ViewerResponseLambdaEdge`, {
+      nodejs,
+      buildOutputPath
     })
 
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
@@ -63,13 +70,14 @@ export class NextCloudfrontStack extends Stack {
     this.cloudfront = new CloudFrontDistribution(this, `${id}-NextCloudFront`, {
       staticBucket,
       renderServerDomain,
-      requestEdgeFunction: this.routingLambdaEdge.lambdaEdge,
-      responseEdgeFunction: this.checkExpLambdaEdge.lambdaEdge,
+      requestEdgeFunction: this.originRequestLambdaEdge.lambdaEdge,
+      responseEdgeFunction: this.originResponseLambdaEdge.lambdaEdge,
+      viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
       cacheConfig,
       imageTTL
     })
 
-    staticBucket.grantRead(this.routingLambdaEdge.lambdaEdge)
-    staticBucket.grantRead(this.checkExpLambdaEdge.lambdaEdge)
+    staticBucket.grantRead(this.originRequestLambdaEdge.lambdaEdge)
+    staticBucket.grantRead(this.originResponseLambdaEdge.lambdaEdge)
   }
 }
