@@ -15,6 +15,7 @@ interface OriginRequestLambdaEdgeProps extends cdk.StackProps {
   nodejs?: string
   cacheConfig: CacheConfig
   bucketRegion?: string
+  nextCachedRoutesMatchers: string[]
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -26,7 +27,15 @@ export class OriginRequestLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: OriginRequestLambdaEdgeProps) {
-    const { bucketName, bucketRegion, renderServerDomain, nodejs, buildOutputPath, cacheConfig } = props
+    const {
+      bucketName,
+      bucketRegion,
+      renderServerDomain,
+      nodejs,
+      buildOutputPath,
+      cacheConfig,
+      nextCachedRoutesMatchers
+    } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -37,7 +46,8 @@ export class OriginRequestLambdaEdge extends Construct {
         'process.env.S3_BUCKET': JSON.stringify(bucketName),
         'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
         'process.env.EB_APP_URL': JSON.stringify(renderServerDomain),
-        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig)
+        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig),
+        'process.env.NEXT_CACHED_ROUTES_MATCHERS': JSON.stringify(nextCachedRoutesMatchers ?? [])
       }
     })
 

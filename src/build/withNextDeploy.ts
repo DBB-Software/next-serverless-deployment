@@ -10,8 +10,7 @@ export const withNextDeploy = async (nextConfig: NextConfig): Promise<NextConfig
       output: 'standalone',
       serverRuntimeConfig: {
         ...nextConfig.serverRuntimeConfig,
-        nextServerlessCacheConfig: cacheConfig,
-        staticBucketName: process.env.STATIC_BUCKET_NAME
+        nextServerlessCacheConfig: cacheConfig
       },
       cacheHandler: require.resolve(path.join('..', 'cacheHandler', 'index.js'))
     }
