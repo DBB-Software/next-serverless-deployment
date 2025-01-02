@@ -2,7 +2,7 @@ import { Construct } from 'constructs'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import path from 'node:path'
-import { buildLambda } from '../../build/edge'
+import { buildLambda } from '../../common/esbuild'
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
   '18': lambda.Runtime.NODEJS_18_X,

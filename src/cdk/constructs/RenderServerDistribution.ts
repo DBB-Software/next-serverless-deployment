@@ -16,6 +16,7 @@ interface RenderServerDistributionProps {
   instanceType?: string
   minInstances?: number
   maxInstances?: number
+  dynamoDBCacheTable: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
@@ -44,7 +45,8 @@ export class RenderServerDistribution extends Construct {
       appName,
       instanceType = 't2.micro',
       minInstances = 1,
-      maxInstances = 2
+      maxInstances = 2,
+      dynamoDBCacheTable
     } = props
 
     this.vpc = new Vpc(this, 'BeanstalkVPC', {
@@ -118,6 +120,11 @@ export class RenderServerDistribution extends Construct {
           namespace: 'aws:elasticbeanstalk:application:environment',
           optionName: 'AWS_REGION',
           value: region
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:application:environment',
+          optionName: 'DYNAMODB_CACHE_TABLE',
+          value: dynamoDBCacheTable
         },
         {
           namespace: 'aws:elasticbeanstalk:environment',

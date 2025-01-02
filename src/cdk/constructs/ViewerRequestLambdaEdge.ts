@@ -5,7 +5,7 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as logs from 'aws-cdk-lib/aws-logs'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
-import { buildLambda } from '../../build/edge'
+import { buildLambda } from '../../common/esbuild'
 import { NextRedirects, DeployConfig } from '../../types'
 
 interface ViewerRequestLambdaEdgeProps extends cdk.StackProps {

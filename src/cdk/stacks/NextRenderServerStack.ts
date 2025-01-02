@@ -1,9 +1,12 @@
 import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
+import * as iam from 'aws-cdk-lib/aws-iam'
 import { RenderServerDistribution } from '../constructs/RenderServerDistribution'
 import { RenderWorkerDistribution } from '../constructs/RenderWorkerDistribution'
+import { DynamoDBDistribution } from '../constructs/DynamoDBDistribution'
 import { addOutput } from '../../common/cdk'
+import path from 'path'
 
 export interface NextRenderServerStackProps extends cdk.StackProps {
   stage: string
@@ -18,6 +21,7 @@ export interface NextRenderServerStackProps extends cdk.StackProps {
 export class NextRenderServerStack extends cdk.Stack {
   public readonly renderServer: RenderServerDistribution
   public readonly renderWorker: RenderWorkerDistribution
+  public readonly dynamoDB: DynamoDBDistribution
   public readonly staticBucket: s3.Bucket
   public readonly staticBucketName: string
 
@@ -48,6 +52,12 @@ export class NextRenderServerStack extends cdk.Stack {
       }
     })
 
+    this.dynamoDB = new DynamoDBDistribution(this, `${id}-DynamoDBCacheTable`, {
+      stage,
+      appName: id,
+      isProduction
+    })
+
     this.renderServer = new RenderServerDistribution(this, `${id}-RenderServer`, {
       stage,
       nodejs,
@@ -57,7 +67,8 @@ export class NextRenderServerStack extends cdk.Stack {
       appName: id,
       instanceType: renderServerInstanceType,
       minInstances: renderServerMinInstances,
-      maxInstances: renderServerMaxInstances
+      maxInstances: renderServerMaxInstances,
+      dynamoDBCacheTable: this.dynamoDB.table.tableName
     })
 
     this.renderWorker = new RenderWorkerDistribution(this, `${id}-renderWorker`, {
@@ -69,9 +80,47 @@ export class NextRenderServerStack extends cdk.Stack {
       appName: id,
       instanceType: renderServerInstanceType, // TODO: separate options from server and worker
       minInstances: renderServerMinInstances,
-      maxInstances: renderServerMaxInstances
+      maxInstances: renderServerMaxInstances,
+      dynamoDBCacheTable: this.dynamoDB.table.tableName
     })
 
+    this.renderServer.ebInstanceProfileRole.addToPolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: [
+          'dynamodb:BatchGetItem',
+          'dynamodb:BatchWriteItem',
+          'dynamodb:DeleteItem',
+          'dynamodb:GetItem',
+          'dynamodb:GetRecords',
+          'dynamodb:PutItem',
+          'dynamodb:UpdateItem',
+          'dynamodb:Scan',
+          'dynamodb:Query'
+        ],
+        resources: [this.dynamoDB.table.tableArn, path.join(this.dynamoDB.table.tableArn, '/index/cacheKey-index')],
+        effect: iam.Effect.ALLOW
+      })
+    )
+
+    this.renderWorker.instanceRole.addToPolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: [
+          'dynamodb:BatchGetItem',
+          'dynamodb:BatchWriteItem',
+          'dynamodb:DeleteItem',
+          'dynamodb:GetItem',
+          'dynamodb:GetRecords',
+          'dynamodb:PutItem',
+          'dynamodb:UpdateItem',
+          'dynamodb:Scan',
+          'dynamodb:Query'
+        ],
+        resources: [this.dynamoDB.table.tableArn, path.join(this.dynamoDB.table.tableArn, '/index/cacheKey-index')],
+        effect: iam.Effect.ALLOW
+      })
+    )
+
     addOutput(this, `${id}-StaticBucketName`, this.staticBucket.bucketName)
+    addOutput(this, `${id}-DynamoDBTableName`, this.dynamoDB.table.tableName)
   }
 }
