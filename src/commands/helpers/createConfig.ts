@@ -4,14 +4,15 @@ import { findConfig } from './loadConfig'
 
 const CONFIG_FILE_NAME = 'next-serverless.config.js'
 const CONFIG_TEMPLATE = `/**
- * @type {import('@dbbs/next-serverless-deployment').CacheConfig}
+ * @type {import('@dbbs/next-serverless-deployment').DeployConfig}
  */
 const config = {
-  noCacheRoutes: [],
-  cacheCookies: [],
-  cacheQueries: [],
-  enableDeviceSplit: false
-}
+  cache: {
+    noCacheRoutes: [],
+    cacheCookies: [],
+    cacheQueries: [],
+    enableDeviceSplit: false}
+  }
 
 module.exports = config
 `

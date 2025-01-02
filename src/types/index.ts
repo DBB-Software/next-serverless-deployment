@@ -7,4 +7,12 @@ export interface CacheConfig {
   enableDeviceSplit?: boolean
 }
 
+export interface DeployConfig {
+  internationalization?: {
+    locales: string[]
+    defaultLocale: string
+  }
+  cache: CacheConfig
+}
+
 export type NextRedirects = Awaited<ReturnType<Required<NextConfig>['redirects']>>

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { CacheConfig } from '../../types'
+import type { DeployConfig } from '../../types'
 
 export const findConfig = (configPath: string): string | undefined => {
   return ['next-serverless.config.js', 'next-serverless.config.mjs', 'next-serverless.config.ts'].find((config) =>
@@ -8,7 +8,7 @@ export const findConfig = (configPath: string): string | undefined => {
   )
 }
 
-async function loadConfig(): Promise<CacheConfig> {
+async function loadConfig(): Promise<DeployConfig> {
   try {
     const serverConfig = findConfig(process.cwd())
 
