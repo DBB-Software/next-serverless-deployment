@@ -1,5 +1,5 @@
 import { CacheEntry, CacheContext } from '@dbbs/next-cache-handler-core'
-import { S3Cache } from './s3'
+import { S3Cache, TAG_PREFIX } from './s3'
 
 const mockHtmlPage = '<p>My Page</p>'
 
@@ -22,6 +22,7 @@ const mockCacheContext: CacheContext = {
 
 const mockBucketName = 'test-bucket'
 const cacheKey = 'test'
+const pageKey = 'index'
 const s3Cache = new S3Cache(mockBucketName)
 
 const store = new Map()
@@ -61,91 +62,108 @@ jest.mock('@aws-sdk/client-s3', () => {
   }
 })
 
+const mockDynamoQuery = jest.fn()
+const mockDynamoPutItem = jest.fn()
+jest.mock('@aws-sdk/client-dynamodb', () => {
+  return {
+    DynamoDB: jest.fn().mockReturnValue({
+      query: jest.fn((...params) => mockDynamoQuery(...params)),
+      putItem: jest.fn((...params) => mockDynamoPutItem(...params))
+    })
+  }
+})
+
 describe('S3Cache', () => {
   afterEach(() => {
     jest.clearAllMocks()
+    store.clear()
   })
   afterAll(() => {
     jest.restoreAllMocks()
   })
 
-  it('should set and read the cache for page router', async () => {
+  it('get should return null', async () => {
+    const result = await s3Cache.get()
+    expect(result).toBeNull()
+  })
+
+  it('should set cache for page router', async () => {
     await s3Cache.set(cacheKey, cacheKey, mockCacheEntry, mockCacheContext)
     expect(s3Cache.client.putObject).toHaveBeenCalledTimes(2)
     expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(1, {
       Bucket: mockBucketName,
       Key: `${cacheKey}/${cacheKey}.html`,
       Body: mockHtmlPage,
-      ContentType: 'text/html'
+      ContentType: 'text/html',
+      Metadata: {
+        'Cache-Fragment-Key': cacheKey
+      }
     })
     expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(2, {
       Bucket: mockBucketName,
       Key: `${cacheKey}/${cacheKey}.json`,
-      Body: JSON.stringify(mockCacheEntry.value.pageData),
-      ContentType: 'application/json'
+      Body: JSON.stringify(mockCacheEntry),
+      ContentType: 'application/json',
+      Metadata: {
+        'Cache-Fragment-Key': cacheKey
+      }
     })
-
-    const result = await s3Cache.get(cacheKey, cacheKey)
-    expect(result).toEqual(mockCacheEntry.value.pageData)
-    expect(s3Cache.client.getObject).toHaveBeenCalledTimes(1)
-    expect(s3Cache.client.getObject).toHaveBeenCalledWith({
-      Bucket: mockBucketName,
-      Key: `${cacheKey}/${cacheKey}.json`
+    expect(mockDynamoPutItem).toHaveBeenCalledWith({
+      TableName: process.env.DYNAMODB_CACHE_TABLE,
+      Item: {
+        pageKey: { S: cacheKey },
+        cacheKey: { S: cacheKey },
+        s3Key: { S: `${cacheKey}/${cacheKey}` },
+        tags: { S: '' },
+        createdAt: { S: expect.any(String) }
+      }
     })
   })
 
-  it('should set and read the cache for app router', async () => {
+  it('should set cache for app router', async () => {
     await s3Cache.set(cacheKey, cacheKey, mockCacheEntry, { ...mockCacheContext, isAppRouter: true })
-    expect(s3Cache.client.putObject).toHaveBeenCalledTimes(2)
+    expect(s3Cache.client.putObject).toHaveBeenCalledTimes(3)
     expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(1, {
       Bucket: mockBucketName,
       Key: `${cacheKey}/${cacheKey}.html`,
       Body: mockHtmlPage,
-      ContentType: 'text/html'
+      ContentType: 'text/html',
+      Metadata: {
+        'Cache-Fragment-Key': cacheKey
+      }
     })
     expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(2, {
       Bucket: mockBucketName,
+      Key: `${cacheKey}/${cacheKey}.json`,
+      Body: JSON.stringify(mockCacheEntry),
+      ContentType: 'application/json',
+      Metadata: {
+        'Cache-Fragment-Key': cacheKey
+      }
+    })
+    expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(3, {
+      Bucket: mockBucketName,
       Key: `${cacheKey}/${cacheKey}.rsc`,
       Body: mockCacheEntry.value.pageData,
-      ContentType: 'text/x-component'
+      ContentType: 'text/x-component',
+      Metadata: {
+        'Cache-Fragment-Key': cacheKey
+      }
     })
-
-    const result = await s3Cache.get(cacheKey, cacheKey)
-    expect(result).toEqual(mockCacheEntry.value.pageData)
-    expect(s3Cache.client.getObject).toHaveBeenCalledTimes(1)
-    expect(s3Cache.client.getObject).toHaveBeenCalledWith({
-      Bucket: mockBucketName,
-      Key: `${cacheKey}/${cacheKey}.json`
+    expect(mockDynamoPutItem).toHaveBeenCalledWith({
+      TableName: process.env.DYNAMODB_CACHE_TABLE,
+      Item: {
+        pageKey: { S: cacheKey },
+        cacheKey: { S: cacheKey },
+        s3Key: { S: `${cacheKey}/${cacheKey}` },
+        tags: { S: '' },
+        createdAt: { S: expect.any(String) }
+      }
     })
   })
 
   it('should delete cache value', async () => {
-    await s3Cache.set(cacheKey, cacheKey, mockCacheEntry, mockCacheContext)
-    expect(s3Cache.client.putObject).toHaveBeenCalledTimes(2)
-    expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(1, {
-      Bucket: mockBucketName,
-      Key: `${cacheKey}/${cacheKey}.html`,
-      Body: mockHtmlPage,
-      ContentType: 'text/html'
-    })
-    expect(s3Cache.client.putObject).toHaveBeenNthCalledWith(2, {
-      Bucket: mockBucketName,
-      Key: `${cacheKey}/${cacheKey}.json`,
-      Body: JSON.stringify(mockCacheEntry.value.pageData),
-      ContentType: 'application/json'
-    })
-
-    const result = await s3Cache.get(cacheKey, cacheKey)
-    expect(result).toEqual(mockCacheEntry.value.pageData)
-    expect(s3Cache.client.getObject).toHaveBeenCalledTimes(1)
-    expect(s3Cache.client.getObject).toHaveBeenCalledWith({
-      Bucket: mockBucketName,
-      Key: `${cacheKey}/${cacheKey}.json`
-    })
-
     await s3Cache.delete(cacheKey, cacheKey)
-    const updatedResult = await s3Cache.get(cacheKey, cacheKey)
-    expect(updatedResult).toBeNull()
     expect(s3Cache.client.deleteObjects).toHaveBeenCalledTimes(1)
     expect(s3Cache.client.deleteObjects).toHaveBeenNthCalledWith(1, {
       Bucket: mockBucketName,
@@ -159,23 +177,64 @@ describe('S3Cache', () => {
     })
   })
 
-  it('should revalidate cache by tag', async () => {
-    const mockCacheEntryWithTags = { ...mockCacheEntry, tags: [cacheKey] }
-    await s3Cache.set(cacheKey, cacheKey, mockCacheEntryWithTags, mockCacheContext)
+  it('should revalidate cache by tag and delete objects', async () => {
+    const s3Path = `${pageKey}/${cacheKey}`
+    const mockQueryResult = {
+      Items: [
+        {
+          pageKey: { S: pageKey },
+          cacheKey: { S: cacheKey }
+        }
+      ]
+    }
 
-    expect(await s3Cache.get(cacheKey, cacheKey)).toEqual(mockCacheEntryWithTags.value.pageData)
+    mockDynamoQuery.mockResolvedValueOnce(mockQueryResult)
+    mockGetObjectTagging.mockResolvedValue({ TagSet: [{ Key: TAG_PREFIX, Value: 'test-tag' }] })
+    mockGetObjectList.mockResolvedValueOnce({
+      Contents: [{ Key: s3Path + '.json' }, { Key: s3Path + '.html' }, { Key: s3Path + '.rsc' }]
+    })
 
-    await s3Cache.revalidateTag(cacheKey)
+    await s3Cache.revalidateTag('test-tag')
 
-    expect(await s3Cache.get(cacheKey, cacheKey)).toBeNull()
+    expect(mockDynamoQuery).toHaveBeenCalledWith({
+      TableName: process.env.DYNAMODB_CACHE_TABLE,
+      KeyConditionExpression: '#field = :value',
+      ExpressionAttributeNames: {
+        '#field': 'tags'
+      },
+      ExpressionAttributeValues: {
+        ':value': { S: 'test-tag' }
+      }
+    })
+
+    expect(s3Cache.client.deleteObjects).toHaveBeenCalledWith({
+      Bucket: mockBucketName,
+      Delete: {
+        Objects: [{ Key: s3Path + '.json' }, { Key: s3Path + '.html' }, { Key: s3Path + '.rsc' }]
+      }
+    })
   })
 
   it('should revalidate cache by path', async () => {
-    await s3Cache.set(cacheKey, cacheKey, mockCacheEntry, mockCacheContext)
-
-    expect(await s3Cache.get(cacheKey, cacheKey)).toEqual(mockCacheEntry.value.pageData)
+    const s3Path = `${pageKey}/${cacheKey}`
+    mockGetObjectList.mockResolvedValueOnce({
+      Contents: [{ Key: s3Path + '.json' }, { Key: s3Path + '.html' }, { Key: s3Path + '.rsc' }]
+    })
 
     await s3Cache.deleteAllByKeyMatch(cacheKey, '')
-    expect(await s3Cache.get(cacheKey, cacheKey)).toBeNull()
+
+    expect(s3Cache.client.listObjectsV2).toHaveBeenCalledWith({
+      Bucket: mockBucketName,
+      ContinuationToken: undefined,
+      Prefix: `${cacheKey}/`,
+      Delimiter: '/'
+    })
+
+    expect(s3Cache.client.deleteObjects).toHaveBeenCalledWith({
+      Bucket: mockBucketName,
+      Delete: {
+        Objects: [{ Key: s3Path + '.json' }, { Key: s3Path + '.html' }, { Key: s3Path + '.rsc' }]
+      }
+    })
   })
 })
