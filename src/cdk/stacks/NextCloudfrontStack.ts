@@ -3,7 +3,6 @@ import { Construct } from 'constructs'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import { OriginRequestLambdaEdge } from '../constructs/OriginRequestLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
-import { OriginResponseLambdaEdge } from '../constructs/OriginResponseLambdaEdge'
 import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
 import { ViewerRequestLambdaEdge } from '../constructs/ViewerRequestLambdaEdge'
 import { DeployConfig, NextRedirects } from '../../types'
@@ -13,8 +12,6 @@ export interface NextCloudfrontStackProps extends StackProps {
   region: string
   staticBucketName: string
   renderServerDomain: string
-  renderWorkerQueueUrl: string
-  renderWorkerQueueArn: string
   buildOutputPath: string
   deployConfig: DeployConfig
   imageTTL?: number
@@ -25,7 +22,6 @@ export interface NextCloudfrontStackProps extends StackProps {
 
 export class NextCloudfrontStack extends Stack {
   public readonly originRequestLambdaEdge: OriginRequestLambdaEdge
-  public readonly originResponseLambdaEdge: OriginResponseLambdaEdge
   public readonly viewerResponseLambdaEdge: ViewerResponseLambdaEdge
   public readonly viewerRequestLambdaEdge: ViewerRequestLambdaEdge
   public readonly cloudfront: CloudFrontDistribution
@@ -37,8 +33,6 @@ export class NextCloudfrontStack extends Stack {
       buildOutputPath,
       staticBucketName,
       renderServerDomain,
-      renderWorkerQueueUrl,
-      renderWorkerQueueArn,
       region,
       deployConfig,
       imageTTL,
@@ -55,15 +49,6 @@ export class NextCloudfrontStack extends Stack {
       cacheConfig: deployConfig.cache,
       bucketRegion: region,
       nextCachedRoutesMatchers
-    })
-
-    this.originResponseLambdaEdge = new OriginResponseLambdaEdge(this, `${id}-OriginResponseLambdaEdge`, {
-      nodejs,
-      renderWorkerQueueUrl,
-      buildOutputPath,
-      cacheConfig: deployConfig.cache,
-      renderWorkerQueueArn,
-      region
     })
 
     this.viewerRequestLambdaEdge = new ViewerRequestLambdaEdge(this, `${id}-ViewerRequestLambdaEdge`, {
@@ -88,7 +73,6 @@ export class NextCloudfrontStack extends Stack {
       staticBucket,
       renderServerDomain,
       requestEdgeFunction: this.originRequestLambdaEdge.lambdaEdge,
-      responseEdgeFunction: this.originResponseLambdaEdge.lambdaEdge,
       viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
       viewerRequestLambdaEdge: this.viewerRequestLambdaEdge.lambdaEdge,
       cacheConfig: deployConfig.cache,
@@ -96,6 +80,5 @@ export class NextCloudfrontStack extends Stack {
     })
 
     staticBucket.grantRead(this.originRequestLambdaEdge.lambdaEdge)
-    staticBucket.grantRead(this.originResponseLambdaEdge.lambdaEdge)
   }
 }

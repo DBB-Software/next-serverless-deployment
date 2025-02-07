@@ -60,20 +60,36 @@ function getS3ObjectPath(request: CloudFrontRequest, cacheConfig: CacheConfig) {
   }
 }
 
-async function checkFileExistsInS3(s3Bucket: string, s3Key: string): Promise<boolean> {
+async function checkFileExistsInS3(
+  s3Bucket: string,
+  s3Key: string
+): Promise<{ LastModified: Date | string; CacheControl: string } | null> {
   try {
-    await s3.send(
+    const { LastModified = '', CacheControl = '' } = await s3.send(
       new HeadObjectCommand({
         Bucket: s3Bucket,
         Key: s3Key
       })
     )
-    return true
+    return { LastModified: LastModified!, CacheControl: CacheControl! }
   } catch (e) {
-    if ((e as Error).name?.includes('NotFound')) return false
+    if ((e as Error).name?.includes('NotFound')) return null
 
     throw e
   }
+}
+
+const shouldRevalidateFile = (s3FileMeta: { LastModified: Date | string; CacheControl: string } | null) => {
+  if (!s3FileMeta) return false
+
+  const { LastModified, CacheControl } = s3FileMeta
+
+  const match = CacheControl.match(/max-age=(\d+)/)
+  const maxAge = match ? parseInt(match[1]) : 0
+
+  const isFileExpired = Date.now() - new Date(LastModified).getTime() > maxAge * 1000
+
+  return isFileExpired
 }
 
 export const handler = async (
@@ -92,9 +108,10 @@ export const handler = async (
 
   try {
     // Check if file exists in S3 when route accepts caching.
-    const isFileExists = isCachedRoute ? await checkFileExistsInS3(s3Bucket, s3Key) : false
+    const s3FileMeta = isCachedRoute ? await checkFileExistsInS3(s3Bucket, s3Key) : false
+    const shouldRenderFile = !s3FileMeta || shouldRevalidateFile(s3FileMeta)
 
-    if (isFileExists) {
+    if (!shouldRenderFile) {
       // Modify s3 path request
       request.uri = `/${s3Key}`
 
