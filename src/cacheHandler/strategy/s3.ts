@@ -2,7 +2,7 @@ import { NEXT_CACHE_TAGS_HEADER } from 'next/dist/lib/constants'
 import { type ListObjectsV2CommandOutput, type PutObjectCommandInput, S3 } from '@aws-sdk/client-s3'
 import { DynamoDB } from '@aws-sdk/client-dynamodb'
 import { chunkArray } from '../../common/array'
-import type { CacheEntry, CacheStrategy, CacheContext } from '@dbbs/next-cache-handler-core'
+import { type CacheEntry, type CacheStrategy, type CacheContext, CachedRouteKind } from '@dbbs/next-cache-handler-core'
 
 export const TAG_PREFIX = 'revalidateTag'
 enum CacheExtension {
@@ -12,7 +12,6 @@ enum CacheExtension {
 }
 const PAGE_CACHE_EXTENSIONS = Object.values(CacheExtension)
 const CHUNK_LIMIT = 1000
-
 export class S3Cache implements CacheStrategy {
   public readonly client: S3
   public readonly bucketName: string
@@ -41,7 +40,7 @@ export class S3Cache implements CacheStrategy {
     )
   }
 
-  async get(): Promise<CacheEntry | null> {
+  async get(): Promise<null> {
     // We always need to return null to make nextjs revalidate the page and create new file in s3
     // caching retreiving logic is handled by CloudFront and origin response lambda
     // we can't use nextjs cache retrival since it is required to re-render page during validation
@@ -51,34 +50,84 @@ export class S3Cache implements CacheStrategy {
   }
 
   async set(pageKey: string, cacheKey: string, data: CacheEntry, ctx: CacheContext): Promise<void> {
-    const promises = []
+    if (!data.value?.kind || data.value?.kind === CachedRouteKind.REDIRECT) return Promise.resolve()
+
+    //@ts-expect-error - TODO: fix this
+    const headersTags = this.buildTagKeys(data.value?.headers?.[NEXT_CACHE_TAGS_HEADER]?.toString())
+
     const baseInput: PutObjectCommandInput = {
       Bucket: this.bucketName,
       Key: `${pageKey}/${cacheKey}`,
       Metadata: {
         'Cache-Fragment-Key': cacheKey
       },
-      ...(data.revalidate ? { CacheControl: `smax-age=${data.revalidate}, stale-while-revalidate` } : undefined)
+      // TODO: check if we want to cache page until next deployment, then next won't pass revalidate value
+      // check how to identify such case
+      ...(data.revalidate ? { CacheControl: `s-maxage=${data.revalidate}, stale-while-revalidate=120` } : undefined)
     }
+    const input: PutObjectCommandInput = { ...baseInput }
 
-    if (data.value?.kind === 'PAGE' || data.value?.kind === 'ROUTE') {
-      const headersTags = this.buildTagKeys(data.value.headers?.[NEXT_CACHE_TAGS_HEADER]?.toString())
-      const input: PutObjectCommandInput = { ...baseInput }
+    const promises = [
+      this.#dynamoDBClient.putItem({
+        TableName: process.env.DYNAMODB_CACHE_TABLE!,
+        Item: {
+          pageKey: { S: pageKey },
+          cacheKey: { S: cacheKey },
+          s3Key: { S: baseInput.Key! },
+          tags: { S: [headersTags, this.buildTagKeys(data.tags)].filter(Boolean).join('&') },
+          createdAt: { S: new Date().toISOString() }
+        }
+      })
+    ]
 
-      promises.push(
-        this.#dynamoDBClient.putItem({
-          TableName: process.env.DYNAMODB_CACHE_TABLE!,
-          Item: {
-            pageKey: { S: pageKey },
-            cacheKey: { S: cacheKey },
-            s3Key: { S: baseInput.Key! },
-            tags: { S: [headersTags, this.buildTagKeys(data.tags)].filter(Boolean).join('&') },
-            createdAt: { S: new Date().toISOString() }
-          }
-        })
-      )
+    console.log('HERE_IS_DATA', data)
+    console.log('HERE_IS_DATA_VALUE', data.value)
 
-      if (data.value?.kind === 'PAGE') {
+    switch (data.value.kind) {
+      case CachedRouteKind.APP_PAGE: {
+        promises.push(
+          ...[
+            this.client.putObject({
+              ...input,
+              Key: `${input.Key}.${CacheExtension.HTML}`,
+              Body: data.value.html,
+              ContentType: 'text/html'
+            }),
+            this.client.putObject({
+              ...input,
+              Key: `${input.Key}.${CacheExtension.RSC}`,
+              Body: data.value.rscData?.toString() as string, // for server react components we need to safe additional reference data for nextjs.
+              ContentType: 'text/x-component'
+            })
+          ]
+        )
+        break
+      }
+      case CachedRouteKind.FETCH: {
+        promises.push(
+          this.client.putObject({
+            ...input,
+            Key: `${input.Key}.${CacheExtension.JSON}`,
+            Body: data.value.data.body.toString(),
+            ContentType: 'application/json'
+          })
+        )
+        break
+      }
+      case CachedRouteKind.APP_ROUTE:
+      case CachedRouteKind.ROUTE: {
+        promises.push(
+          this.client.putObject({
+            ...input,
+            Key: `${input.Key}.${CacheExtension.JSON}`,
+            Body: data.value.body.toString(),
+            ContentType: 'application/json'
+          })
+        )
+        break
+      }
+      case CachedRouteKind.PAGE:
+      case CachedRouteKind.PAGES: {
         promises.push(
           this.client.putObject({
             ...input,
@@ -87,44 +136,28 @@ export class S3Cache implements CacheStrategy {
             ContentType: 'text/html'
           })
         )
-        promises.push(
-          this.client.putObject({
-            ...input,
-            Key: `${input.Key}.${CacheExtension.JSON}`,
-            Body: JSON.stringify(data),
-            ContentType: 'application/json'
-          })
-        )
+
         if (ctx.isAppRouter) {
           promises.push(
             this.client.putObject({
               ...input,
               Key: `${input.Key}.${CacheExtension.RSC}`,
+              // @ts-expect-error - TODO: fix this
               Body: data.value.pageData as string, // for server react components we need to safe additional reference data for nextjs.
               ContentType: 'text/x-component'
             })
           )
+        } else {
+          promises.push(
+            this.client.putObject({
+              ...input,
+              Key: `${input.Key}.${CacheExtension.JSON}`,
+              Body: JSON.stringify(data),
+              ContentType: 'application/json'
+            })
+          )
         }
-      } else {
-        promises.push(
-          this.client.putObject({
-            ...input,
-            Key: `${input.Key}.${CacheExtension.JSON}`,
-            Body: JSON.stringify(data),
-            ContentType: 'application/json'
-          })
-        )
       }
-    } else {
-      promises.push(
-        this.client.putObject({
-          ...baseInput,
-          Key: `${baseInput.Key}.${CacheExtension.JSON}`,
-          Body: JSON.stringify(data),
-          ContentType: 'application/json'
-          // ...(data.tags?.length ? { Tagging: `${this.buildTagKeys(data.tags)}` } : {})
-        })
-      )
     }
 
     await Promise.all(promises)
@@ -177,7 +210,6 @@ export class S3Cache implements CacheStrategy {
   }
 
   async delete(pageKey: string, cacheKey: string): Promise<void> {
-    console.log('HERE_IS_CALL_DELETE')
     await this.client.deleteObjects({
       Bucket: this.bucketName,
       Delete: { Objects: PAGE_CACHE_EXTENSIONS.map((ext) => ({ Key: `${pageKey}/${cacheKey}.${ext}` })) }

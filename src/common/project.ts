@@ -1,5 +1,7 @@
 import fs from 'node:fs'
 import path from 'path'
+import vm from 'node:vm'
+import esbuild from 'esbuild'
 
 export interface ProjectPackager {
   type: 'npm' | 'yarn' | 'pnpm'
@@ -27,7 +29,9 @@ export const findPackager = (appPath: string): ProjectPackager | undefined => {
 }
 
 export const findNextConfig = (appPath: string): string | undefined => {
-  return ['next.config.js', 'next.config.mjs'].find((config) => fs.existsSync(path.join(appPath, config)))
+  return ['next.config.js', 'next.config.mjs', 'next.config.ts'].find((config) =>
+    fs.existsSync(path.join(appPath, config))
+  )
 }
 
 const checkIsAppDir = (appPath: string): boolean => {
@@ -39,7 +43,7 @@ export const getProjectSettings = (projectPath: string): ProjectSettings | undef
   const nextConfig = findNextConfig(projectPath)
 
   if (!nextConfig) {
-    throw new Error('Could not find next.config.(js|mjs)')
+    throw new Error('Could not find next.config.(js|mjs|ts)')
   }
 
   while (currentPath !== '/') {
@@ -61,5 +65,24 @@ export const getProjectSettings = (projectPath: string): ProjectSettings | undef
 }
 
 export const loadFile = async (filePath: string) => {
+  if (filePath.endsWith('.ts')) {
+    const fileContent = fs.readFileSync(filePath, 'utf-8')
+    const res = await esbuild.transform(fileContent, {
+      target: 'es2022',
+      format: 'cjs',
+      platform: 'node',
+      loader: 'ts'
+    })
+    const script = new vm.Script(res.code)
+    const context = vm.createContext({ module: {}, exports: {}, require })
+    script.runInContext(context)
+    console.log({
+      context,
+      module: context.module,
+      default: context.module.exports.default
+    })
+    return context.module.exports.default
+  }
+
   return import(filePath).then((r) => r.default)
 }
