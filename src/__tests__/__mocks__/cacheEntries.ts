@@ -3,7 +3,6 @@ import {
   CachedRedirectValue,
   IncrementalCachedPageValue,
   IncrementalCachedAppPageValue,
-  CachedImageValue,
   CachedFetchValue,
   CachedRouteValue
 } from '@dbbs/next-cache-handler-core'
