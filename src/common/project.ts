@@ -76,11 +76,7 @@ export const loadFile = async (filePath: string) => {
     const script = new vm.Script(res.code)
     const context = vm.createContext({ module: {}, exports: {}, require })
     script.runInContext(context)
-    console.log({
-      context,
-      module: context.module,
-      default: context.module.exports.default
-    })
+
     return context.module.exports.default
   }
 
