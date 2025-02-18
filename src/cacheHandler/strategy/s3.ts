@@ -12,6 +12,8 @@ enum CacheExtension {
 }
 const PAGE_CACHE_EXTENSIONS = Object.values(CacheExtension)
 const CHUNK_LIMIT = 1000
+export const CACHE_ONE_YEAR = 31536000
+
 export class S3Cache implements CacheStrategy {
   public readonly client: S3
   public readonly bucketName: string
@@ -50,10 +52,13 @@ export class S3Cache implements CacheStrategy {
   }
 
   async set(pageKey: string, cacheKey: string, data: CacheEntry, ctx: CacheContext): Promise<void> {
-    if (!data.value?.kind || data.value?.kind === CachedRouteKind.REDIRECT) return Promise.resolve()
+    if (!data.value?.kind || data.value.kind === CachedRouteKind.REDIRECT || data.revalidate === 0)
+      return Promise.resolve()
 
-    //@ts-expect-error - TODO: fix this
-    const headersTags = this.buildTagKeys(data.value?.headers?.[NEXT_CACHE_TAGS_HEADER]?.toString())
+    let headersTags = ''
+    if ('headers' in data.value) {
+      headersTags = this.buildTagKeys(data.value?.headers?.[NEXT_CACHE_TAGS_HEADER]?.toString())
+    }
 
     const baseInput: PutObjectCommandInput = {
       Bucket: this.bucketName,
@@ -61,9 +66,7 @@ export class S3Cache implements CacheStrategy {
       Metadata: {
         'Cache-Fragment-Key': cacheKey
       },
-      // TODO: check if we want to cache page until next deployment, then next won't pass revalidate value
-      // check how to identify such case
-      ...(data.revalidate ? { CacheControl: `s-maxage=${data.revalidate}, stale-while-revalidate=120` } : undefined)
+      CacheControl: `s-maxage=${data.revalidate || CACHE_ONE_YEAR}, stale-while-revalidate=${CACHE_ONE_YEAR - (data.revalidate || 0)}`
     }
     const input: PutObjectCommandInput = { ...baseInput }
 
@@ -79,9 +82,6 @@ export class S3Cache implements CacheStrategy {
         }
       })
     ]
-
-    console.log('HERE_IS_DATA', data)
-    console.log('HERE_IS_DATA_VALUE', data.value)
 
     switch (data.value.kind) {
       case CachedRouteKind.APP_PAGE: {
@@ -142,8 +142,7 @@ export class S3Cache implements CacheStrategy {
             this.client.putObject({
               ...input,
               Key: `${input.Key}.${CacheExtension.RSC}`,
-              // @ts-expect-error - TODO: fix this
-              Body: data.value.pageData as string, // for server react components we need to safe additional reference data for nextjs.
+              Body: data.value.pageData as unknown as string, // for server react components we need to safe additional reference data for nextjs.
               ContentType: 'text/x-component'
             })
           )

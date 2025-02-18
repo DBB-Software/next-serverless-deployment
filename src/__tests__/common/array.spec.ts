@@ -1,4 +1,4 @@
-import { chunkArray } from './array'
+import { chunkArray } from '../../common/array'
 
 describe('chunkArray', () => {
   interface TestCase<T> {

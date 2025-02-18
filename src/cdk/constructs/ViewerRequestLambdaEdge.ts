@@ -13,7 +13,6 @@ interface ViewerRequestLambdaEdgeProps extends cdk.StackProps {
   nodejs?: string
   redirects?: NextRedirects
   internationalizationConfig?: DeployConfig['internationalization']
-  trailingSlash?: boolean
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -25,7 +24,7 @@ export class ViewerRequestLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: ViewerRequestLambdaEdgeProps) {
-    const { nodejs, buildOutputPath, redirects, internationalizationConfig, trailingSlash = false } = props
+    const { nodejs, buildOutputPath, redirects, internationalizationConfig } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -34,8 +33,7 @@ export class ViewerRequestLambdaEdge extends Construct {
     buildLambda(name, buildOutputPath, {
       define: {
         'process.env.REDIRECTS': JSON.stringify(redirects ?? []),
-        'process.env.LOCALES_CONFIG': JSON.stringify(internationalizationConfig ?? null),
-        'process.env.IS_TRAILING_SLASH': JSON.stringify(trailingSlash)
+        'process.env.LOCALES_CONFIG': JSON.stringify(internationalizationConfig ?? null)
       }
     })
 
