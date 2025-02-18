@@ -8,11 +8,9 @@ export interface CacheConfig {
 }
 
 export interface DeployConfig {
-  internationalization?: {
-    locales: string[]
-    defaultLocale: string
-  }
   cache: CacheConfig
 }
 
 export type NextRedirects = Awaited<ReturnType<Required<NextConfig>['redirects']>>
+
+export type NextI18nConfig = NextConfig['i18n']
