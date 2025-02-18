@@ -4,8 +4,7 @@ import { DynamoDB } from '@aws-sdk/client-dynamodb'
 import { chunkArray } from '../../common/array'
 import type { CacheEntry, CacheStrategy, CacheContext } from '@dbbs/next-cache-handler-core'
 
-const TAG_PREFIX = 'revalidateTag'
-const NOT_FOUND_ERROR = ['NotFound', 'NoSuchKey']
+export const TAG_PREFIX = 'revalidateTag'
 enum CacheExtension {
   JSON = 'json',
   HTML = 'html',
@@ -42,24 +41,13 @@ export class S3Cache implements CacheStrategy {
     )
   }
 
-  async get(pageKey: string, cacheKey: string): Promise<CacheEntry | null> {
-    if (!this.client) return null
-
-    const pageData = await this.client
-      .getObject({
-        Bucket: this.bucketName,
-        Key: `${pageKey}/${cacheKey}.${CacheExtension.JSON}`
-      })
-      .catch((error) => {
-        if (NOT_FOUND_ERROR.includes(error.name)) return null
-        throw error
-      })
-
-    if (!pageData?.Body) return null
-
-    const response = await pageData.Body.transformToString('utf-8')
-
-    return JSON.parse(response)
+  async get(): Promise<CacheEntry | null> {
+    // We always need to return null to make nextjs revalidate the page and create new file in s3
+    // caching retreiving logic is handled by CloudFront and origin response lambda
+    // we can't use nextjs cache retrival since it is required to re-render page during validation
+    // but nextjs built in `revalidate` only clears cache, but does not re-render the page
+    // so we need to have custom handler to revalidate and re-render the page
+    return null
   }
 
   async set(pageKey: string, cacheKey: string, data: CacheEntry, ctx: CacheContext): Promise<void> {

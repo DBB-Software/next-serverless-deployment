@@ -11,7 +11,6 @@ interface CloudFrontPropsDistribution {
   staticBucket: s3.IBucket
   renderServerDomain: string
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
-  responseEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerResponseEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerRequestLambdaEdge: cloudfront.experimental.EdgeFunction
   cacheConfig: CacheConfig
@@ -34,7 +33,6 @@ export class CloudFrontDistribution extends Construct {
     const {
       staticBucket,
       requestEdgeFunction,
-      responseEdgeFunction,
       viewerResponseEdgeFunction,
       viewerRequestLambdaEdge,
       cacheConfig,
@@ -93,10 +91,6 @@ export class CloudFrontDistribution extends Construct {
           {
             functionVersion: requestEdgeFunction.currentVersion,
             eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
-          },
-          {
-            functionVersion: responseEdgeFunction.currentVersion,
-            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE
           },
           {
             functionVersion: viewerResponseEdgeFunction.currentVersion,

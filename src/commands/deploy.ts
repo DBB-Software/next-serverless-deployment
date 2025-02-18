@@ -149,8 +149,6 @@ export const deploy = async (config: DeployConfig) => {
         nodejs: config.nodejs,
         staticBucketName: nextRenderServerStackOutput.StaticBucketName,
         renderServerDomain: nextRenderServerStackOutput.RenderServerDomain,
-        renderWorkerQueueUrl: nextRenderServerStackOutput.RenderWorkerQueueUrl,
-        renderWorkerQueueArn: nextRenderServerStackOutput.RenderWorkerQueueArn,
         buildOutputPath: outputPath,
         crossRegionReferences: true,
         region,

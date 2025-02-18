@@ -1,6 +1,7 @@
 import { Construct } from 'constructs'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import { RemovalPolicy } from 'aws-cdk-lib'
+import { addOutput } from '../../common/cdk'
 
 interface DynamoDBDistributionProps {
   stage: string
@@ -23,22 +24,24 @@ export class DynamoDBDistribution extends Construct {
         type: dynamodb.AttributeType.STRING
       },
       sortKey: {
-        name: 'tags',
+        name: 'cacheKey',
         type: dynamodb.AttributeType.STRING
       },
       removalPolicy: props.isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
     })
 
     this.table.addGlobalSecondaryIndex({
-      indexName: 'cacheKey-index',
+      indexName: 'pageKey-tags-index',
       partitionKey: {
         name: 'pageKey',
         type: dynamodb.AttributeType.STRING
       },
       sortKey: {
-        name: 'cacheKey',
+        name: 'tags',
         type: dynamodb.AttributeType.STRING
       }
     })
+
+    addOutput(this, `${appName}-DynamoDBCacheTableName`, this.table.tableName)
   }
 }
