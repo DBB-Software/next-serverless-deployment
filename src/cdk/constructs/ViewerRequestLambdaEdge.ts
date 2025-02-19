@@ -6,14 +6,13 @@ import * as logs from 'aws-cdk-lib/aws-logs'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
 import { buildLambda } from '../../common/esbuild'
-import { NextRedirects, DeployConfig } from '../../types'
+import { NextRedirects, NextI18nConfig } from '../../types'
 
 interface ViewerRequestLambdaEdgeProps extends cdk.StackProps {
   buildOutputPath: string
   nodejs?: string
   redirects?: NextRedirects
-  internationalizationConfig?: DeployConfig['internationalization']
-  trailingSlash?: boolean
+  nextI18nConfig?: NextI18nConfig
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -25,7 +24,7 @@ export class ViewerRequestLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: ViewerRequestLambdaEdgeProps) {
-    const { nodejs, buildOutputPath, redirects, internationalizationConfig, trailingSlash = false } = props
+    const { nodejs, buildOutputPath, redirects, nextI18nConfig } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -34,8 +33,7 @@ export class ViewerRequestLambdaEdge extends Construct {
     buildLambda(name, buildOutputPath, {
       define: {
         'process.env.REDIRECTS': JSON.stringify(redirects ?? []),
-        'process.env.LOCALES_CONFIG': JSON.stringify(internationalizationConfig ?? null),
-        'process.env.IS_TRAILING_SLASH': JSON.stringify(trailingSlash)
+        'process.env.LOCALES_CONFIG': JSON.stringify(nextI18nConfig ?? null)
       }
     })
 

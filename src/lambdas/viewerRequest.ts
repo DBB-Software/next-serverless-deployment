@@ -1,5 +1,5 @@
 import type { CloudFrontRequestCallback, Context, CloudFrontResponseEvent } from 'aws-lambda'
-import type { NextRedirects, DeployConfig } from '../types'
+import type { NextRedirects, NextI18nConfig } from '../types'
 import path from 'node:path'
 
 /**
@@ -18,15 +18,7 @@ export const handler = async (
 ) => {
   const request = event.Records[0].cf.request
   const redirectsConfig = process.env.REDIRECTS as unknown as NextRedirects
-  const localesConfig = process.env.LOCALES_CONFIG as unknown as DeployConfig['internationalization'] | null
-  const isTrailingSlash = process.env.IS_TRAILING_SLASH as unknown as boolean
-  const pathHasTrailingSlash = request.uri.endsWith('/')
-
-  if (pathHasTrailingSlash && !isTrailingSlash) {
-    request.uri = request.uri.slice(0, -1)
-  } else if (!pathHasTrailingSlash && isTrailingSlash) {
-    request.uri += '/'
-  }
+  const localesConfig = process.env.LOCALES_CONFIG as unknown as NextI18nConfig | null
 
   let shouldRedirectWithLocale = false
   let pagePath = request.uri

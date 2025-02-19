@@ -84,8 +84,9 @@ const shouldRevalidateFile = (s3FileMeta: { LastModified: Date | string; CacheCo
 
   const { LastModified, CacheControl } = s3FileMeta
 
-  const match = CacheControl.match(/max-age=(\d+)/)
-  const maxAge = match ? parseInt(match[1]) : 0
+  const sMaxAgeMatch = CacheControl.match(/s-maxage=(\d+)/)
+  const maxAgeMatch = CacheControl.match(/max-age=(\d+)/)
+  const maxAge = sMaxAgeMatch ? parseInt(sMaxAgeMatch[1]) : maxAgeMatch ? parseInt(maxAgeMatch[1]) : 0
 
   const isFileExpired = Date.now() - new Date(LastModified).getTime() > maxAge * 1000
 

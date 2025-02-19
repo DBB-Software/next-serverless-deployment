@@ -86,6 +86,7 @@ export const deploy = async (config: DeployConfig) => {
 
     const nextConfig = (await loadFile(projectSettings.nextConfigPath)) as NextConfig
     const nextRedirects = nextConfig.redirects ? await nextConfig.redirects() : undefined
+    const nextI18nConfig = nextConfig.i18n
 
     const outputPath = createOutputFolder()
 
@@ -154,7 +155,7 @@ export const deploy = async (config: DeployConfig) => {
         region,
         deployConfig,
         imageTTL: nextConfig.imageTTL,
-        trailingSlash: nextConfig.trailingSlash,
+        nextI18nConfig,
         redirects: nextRedirects,
         nextCachedRoutesMatchers,
         env: {
