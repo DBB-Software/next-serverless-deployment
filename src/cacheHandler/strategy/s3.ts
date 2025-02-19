@@ -1,4 +1,5 @@
 import { NEXT_CACHE_TAGS_HEADER } from 'next/dist/lib/constants'
+import { formatRevalidate } from 'next/dist/server/lib/revalidate'
 import { type ListObjectsV2CommandOutput, type PutObjectCommandInput, S3 } from '@aws-sdk/client-s3'
 import { DynamoDB } from '@aws-sdk/client-dynamodb'
 import { chunkArray } from '../../common/array'
@@ -52,7 +53,12 @@ export class S3Cache implements CacheStrategy {
   }
 
   async set(pageKey: string, cacheKey: string, data: CacheEntry, ctx: CacheContext): Promise<void> {
-    if (!data.value?.kind || data.value.kind === CachedRouteKind.REDIRECT || data.revalidate === 0)
+    if (
+      !data.value?.kind ||
+      data.value.kind === CachedRouteKind.REDIRECT ||
+      data.revalidate === 0 ||
+      data.revalidate === undefined
+    )
       return Promise.resolve()
 
     let headersTags = ''
@@ -66,7 +72,10 @@ export class S3Cache implements CacheStrategy {
       Metadata: {
         'Cache-Fragment-Key': cacheKey
       },
-      CacheControl: `s-maxage=${data.revalidate || CACHE_ONE_YEAR}, stale-while-revalidate=${CACHE_ONE_YEAR - (data.revalidate || 0)}`
+      CacheControl: formatRevalidate({
+        revalidate: data.revalidate,
+        swrDelta: data.revalidate ? CACHE_ONE_YEAR - data.revalidate : CACHE_ONE_YEAR
+      })
     }
     const input: PutObjectCommandInput = { ...baseInput }
 
@@ -156,6 +165,10 @@ export class S3Cache implements CacheStrategy {
             })
           )
         }
+        break
+      }
+      default: {
+        console.warn(`Unknown cache kind: ${data.value.kind}`)
       }
     }
 
