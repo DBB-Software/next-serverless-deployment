@@ -1,7 +1,7 @@
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import type { CloudFrontRequestEvent, CloudFrontRequestCallback, CloudFrontRequest, Context } from 'aws-lambda'
 import crypto from 'node:crypto'
-import { CacheConfig } from '../types'
+import { CacheConfig, NextRewrites, NextRewriteEntity } from '../types'
 import {
   transformQueryToObject,
   transformCookiesToObject,
@@ -93,6 +93,57 @@ const shouldRevalidateFile = (s3FileMeta: { LastModified: Date | string; CacheCo
   return isFileExpired
 }
 
+/**
+ * Validates if a CloudFront request matches the conditions specified in the 'has' property of a rewrite rule
+ * @param request - The CloudFront request object to validate
+ * @param has - Array of conditions to check (header, query param, or cookie)
+ * @returns True if all conditions match or if no conditions specified, false otherwise
+ */
+const validateRouteHasMatch = (request: CloudFrontRequest, has: NextRewriteEntity['has']) => {
+  if (!has) return true
+
+  return has.every((h) => {
+    if (h.type === 'header') {
+      const header = request.headers[h.key]
+
+      return h.value ? header?.some((header) => header.value === h.value) : !!header
+    }
+
+    if (h.type === 'query' && request.querystring) {
+      const searchParams = new URLSearchParams(request.querystring)
+
+      return h.value ? searchParams.get(h.key) === h.value : searchParams.has(h.key)
+    }
+
+    if (h.type === 'cookie') {
+      const cookies = request.headers.cookie?.[0].value
+
+      return cookies?.includes(`${h.key}=${h.value ?? ''}`)
+    }
+
+    return false
+  })
+}
+
+/**
+ * Checks if a CloudFront request matches any rewrite rules and updates the URI if matched
+ * @param request - The CloudFront request object to validate and potentially modify
+ * @param rewritesConfig - Array of rewrite rules to check against
+ */
+const validateRewriteRoute = (request: CloudFrontRequest, rewritesConfig: NextRewrites) => {
+  const rewriteRoute = rewritesConfig.find((rewrite) => {
+    const { regex, has } = rewrite
+
+    const hasMatches = validateRouteHasMatch(request, has)
+
+    return hasMatches && new RegExp(regex).test(request.uri)
+  })
+
+  if (rewriteRoute) {
+    request.uri = rewriteRoute.destination
+  }
+}
+
 export const handler = async (
   event: CloudFrontRequestEvent,
   _context: Context,
@@ -102,8 +153,11 @@ export const handler = async (
   const s3Bucket = process.env.S3_BUCKET!
   const cacheConfig = process.env.CACHE_CONFIG as CacheConfig
   const nextCachedRoutesMatchers = process.env.NEXT_CACHED_ROUTES_MATCHERS as unknown as string[]
+  const nextRewritesConfig = process.env.NEXT_REWRITES_CONFIG as unknown as NextRewrites
   const { s3Key } = getS3ObjectPath(request, cacheConfig)
   const ebAppUrl = process.env.EB_APP_URL!
+
+  validateRewriteRoute(request, nextRewritesConfig)
 
   const isCachedRoute = nextCachedRoutesMatchers.some((matcher) => RegExp(matcher).test(request.uri))
 

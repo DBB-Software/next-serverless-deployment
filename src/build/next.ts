@@ -3,6 +3,7 @@ import fs from 'fs/promises'
 import path from 'node:path'
 import type { PrerenderManifest, RoutesManifest } from 'next/dist/build'
 import { type ProjectPackager, type ProjectSettings } from '../common/project'
+import { NextRewrites } from '../types'
 
 interface BuildOptions {
   packager: ProjectPackager
@@ -40,7 +41,32 @@ const copyAssets = async (outputPath: string, appPath: string, appRelativePath: 
   )
 }
 
-export const getNextCachedRoutesMatchers = async (outputPath: string, appRelativePath: string): Promise<string[]> => {
+const getRewritesConfig = (manifestRules: RoutesManifest['rewrites']): NextRewrites => {
+  if (!manifestRules) {
+    return []
+  }
+
+  if (Array.isArray(manifestRules)) {
+    return manifestRules.map((rule) => ({
+      source: rule.source,
+      destination: rule.destination,
+      regex: rule.regex,
+      has: rule.has
+    }))
+  }
+
+  return [...manifestRules.beforeFiles, ...manifestRules.afterFiles, ...manifestRules.fallback].map((rule) => ({
+    source: rule.source,
+    destination: rule.destination,
+    regex: rule.regex,
+    has: rule.has
+  }))
+}
+
+export const getNextCachedRoutesConfig = async (
+  outputPath: string,
+  appRelativePath: string
+): Promise<{ cachedRoutesMatchers: string[]; rewritesConfig: NextRewrites }> => {
   const prerenderManifestJSON = await fs.readFile(
     path.join(outputPath, '.next', 'standalone', appRelativePath, '.next', 'prerender-manifest.json'),
     'utf-8'
@@ -53,13 +79,20 @@ export const getNextCachedRoutesMatchers = async (outputPath: string, appRelativ
   const prerenderManifest = JSON.parse(prerenderManifestJSON) as PrerenderManifest
   const routesManifest = JSON.parse(routesManifestJSON) as RoutesManifest
 
-  return [...routesManifest.dynamicRoutes, ...routesManifest.staticRoutes].reduce((prev, route) => {
-    if (prerenderManifest.routes?.[route.page] || prerenderManifest.dynamicRoutes?.[route.page]) {
-      prev.push(route.regex)
-    }
+  const cachedRoutesMatchers = [...routesManifest.dynamicRoutes, ...routesManifest.staticRoutes].reduce(
+    (prev, route) => {
+      if (prerenderManifest.routes?.[route.page] || prerenderManifest.dynamicRoutes?.[route.page]) {
+        prev.push(route.regex)
+      }
 
-    return prev
-  }, [] as string[])
+      return prev
+    },
+    [] as string[]
+  )
+
+  const rewritesConfig = getRewritesConfig(routesManifest.rewrites)
+
+  return { cachedRoutesMatchers, rewritesConfig }
 }
 
 export const buildApp = async (options: BuildAppOptions) => {
@@ -74,7 +107,7 @@ export const buildApp = async (options: BuildAppOptions) => {
   const appRelativePath = isMonorepo ? path.relative(root, projectPath) : ''
 
   await copyAssets(outputPath, projectPath, appRelativePath)
-  const nextCachedRoutesMatchers = await getNextCachedRoutesMatchers(outputPath, appRelativePath)
+  const { cachedRoutesMatchers, rewritesConfig } = await getNextCachedRoutesConfig(outputPath, appRelativePath)
 
-  return { nextCachedRoutesMatchers }
+  return { cachedRoutesMatchers, rewritesConfig }
 }

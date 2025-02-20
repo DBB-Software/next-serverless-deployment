@@ -5,7 +5,7 @@ import { OriginRequestLambdaEdge } from '../constructs/OriginRequestLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
 import { ViewerRequestLambdaEdge } from '../constructs/ViewerRequestLambdaEdge'
-import { DeployConfig, NextRedirects, NextI18nConfig } from '../../types'
+import { DeployConfig, NextRedirects, NextI18nConfig, NextRewrites } from '../../types'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -17,7 +17,8 @@ export interface NextCloudfrontStackProps extends StackProps {
   imageTTL?: number
   redirects?: NextRedirects
   nextI18nConfig?: NextI18nConfig
-  nextCachedRoutesMatchers: string[]
+  cachedRoutesMatchers: string[]
+  rewritesConfig: NextRewrites
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -37,8 +38,9 @@ export class NextCloudfrontStack extends Stack {
       deployConfig,
       imageTTL,
       redirects,
-      nextCachedRoutesMatchers,
-      nextI18nConfig
+      cachedRoutesMatchers,
+      nextI18nConfig,
+      rewritesConfig
     } = props
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
@@ -48,7 +50,8 @@ export class NextCloudfrontStack extends Stack {
       buildOutputPath,
       cacheConfig: deployConfig.cache,
       bucketRegion: region,
-      nextCachedRoutesMatchers
+      cachedRoutesMatchers,
+      rewritesConfig
     })
 
     this.viewerRequestLambdaEdge = new ViewerRequestLambdaEdge(this, `${id}-ViewerRequestLambdaEdge`, {
