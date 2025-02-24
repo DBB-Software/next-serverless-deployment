@@ -113,7 +113,7 @@ export const deploy = async (config: DeployConfig) => {
     const siteNameLowerCased = siteName.toLowerCase()
 
     // Build and zip app.
-    const { nextCachedRoutesMatchers } = await buildApp({
+    const { cachedRoutesMatchers, rewritesConfig } = await buildApp({
       projectSettings,
       outputPath
     })
@@ -157,7 +157,8 @@ export const deploy = async (config: DeployConfig) => {
         imageTTL: nextConfig.imageTTL,
         nextI18nConfig,
         redirects: nextRedirects,
-        nextCachedRoutesMatchers,
+        cachedRoutesMatchers,
+        rewritesConfig,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }
