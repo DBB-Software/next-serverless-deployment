@@ -77,7 +77,7 @@ export class NextCloudfrontStack extends Stack {
       requestEdgeFunction: this.originRequestLambdaEdge.lambdaEdge,
       viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
       viewerRequestLambdaEdge: this.viewerRequestLambdaEdge.lambdaEdge,
-      cacheConfig: deployConfig.cache,
+      deployConfig: deployConfig,
       imageTTL
     })
 

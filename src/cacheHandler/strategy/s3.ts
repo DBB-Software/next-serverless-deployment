@@ -78,6 +78,7 @@ export class S3Cache implements CacheStrategy {
       })
     }
     const input: PutObjectCommandInput = { ...baseInput }
+    const tagsValue = [headersTags, this.buildTagKeys(data.tags)].filter(Boolean).join('&')
 
     const promises = [
       this.#dynamoDBClient.putItem({
@@ -86,8 +87,9 @@ export class S3Cache implements CacheStrategy {
           pageKey: { S: pageKey },
           cacheKey: { S: cacheKey },
           s3Key: { S: baseInput.Key! },
-          tags: { S: [headersTags, this.buildTagKeys(data.tags)].filter(Boolean).join('&') },
-          createdAt: { S: new Date().toISOString() }
+          createdAt: { S: new Date().toISOString() },
+          // TODO: check for empty tags
+          ...(tagsValue && { tags: { S: tagsValue } })
         }
       })
     ]
