@@ -6,6 +6,7 @@ import * as AWS from 'aws-sdk'
 import { partition } from '@aws-sdk/util-endpoints'
 import fs from 'node:fs'
 import path from 'node:path'
+import mime from 'mime-types'
 
 type GetAWSBasicProps =
   | {
@@ -46,18 +47,7 @@ export const getSTSIdentity = async (props: GetAWSBasicProps) => {
 export const getFileContentType = (filePath?: string) => {
   if (!filePath) return
 
-  const extension = path.extname(filePath)
-
-  switch (extension) {
-    case '.css':
-      return 'text/css'
-    case '.js':
-      return 'application/javascript'
-    case '..html':
-      return 'text/html'
-    default:
-      return 'application/octet-stream'
-  }
+  return mime.lookup(filePath) || 'application/octet-stream'
 }
 
 export const uploadFileToS3 = async (s3Client: S3, options: PutObjectCommandInput) => {
