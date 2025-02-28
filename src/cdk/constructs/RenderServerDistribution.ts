@@ -20,8 +20,8 @@ interface RenderServerDistributionProps {
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
-  '18': '64bit Amazon Linux 2023 v6.2.2 running Node.js 18',
-  '20': '64bit Amazon Linux 2023 v6.2.2 running Node.js 20'
+  '18': '64bit Amazon Linux 2023 v6.4.3 running Node.js 18',
+  '20': '64bit Amazon Linux 2023 v6.4.3 running Node.js 20'
 }
 
 export class RenderServerDistribution extends Construct {

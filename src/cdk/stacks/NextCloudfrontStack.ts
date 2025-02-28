@@ -15,10 +15,11 @@ export interface NextCloudfrontStackProps extends StackProps {
   buildOutputPath: string
   deployConfig: DeployConfig
   imageTTL?: number
-  redirects?: NextRedirects
+  redirectsConfig?: NextRedirects
   nextI18nConfig?: NextI18nConfig
   cachedRoutesMatchers: string[]
   rewritesConfig: NextRewrites
+  isTrailingSlashEnabled: boolean
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -37,10 +38,11 @@ export class NextCloudfrontStack extends Stack {
       region,
       deployConfig,
       imageTTL,
-      redirects,
+      redirectsConfig,
       cachedRoutesMatchers,
       nextI18nConfig,
-      rewritesConfig
+      rewritesConfig,
+      isTrailingSlashEnabled
     } = props
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
@@ -50,15 +52,16 @@ export class NextCloudfrontStack extends Stack {
       buildOutputPath,
       cacheConfig: deployConfig.cache,
       bucketRegion: region,
-      cachedRoutesMatchers,
-      rewritesConfig
+      cachedRoutesMatchers
     })
 
     this.viewerRequestLambdaEdge = new ViewerRequestLambdaEdge(this, `${id}-ViewerRequestLambdaEdge`, {
       buildOutputPath,
       nodejs,
-      redirects,
-      nextI18nConfig
+      redirectsConfig,
+      rewritesConfig,
+      nextI18nConfig,
+      isTrailingSlashEnabled
     })
 
     this.viewerResponseLambdaEdge = new ViewerResponseLambdaEdge(this, `${id}-ViewerResponseLambdaEdge`, {

@@ -3,7 +3,7 @@ import fs from 'fs/promises'
 import path from 'node:path'
 import type { PrerenderManifest, RoutesManifest } from 'next/dist/build'
 import { type ProjectPackager, type ProjectSettings } from '../common/project'
-import { NextRewrites } from '../types'
+import { NextRewrites, NextRedirects } from '../types'
 
 interface BuildOptions {
   packager: ProjectPackager
@@ -66,10 +66,26 @@ const getRewritesConfig = (manifestRules: RoutesManifest['rewrites']): NextRewri
   }))
 }
 
+const getRedirectsConfig = (manifestRedirects: RoutesManifest['redirects']): NextRedirects => {
+  if (!manifestRedirects) {
+    return []
+  }
+
+  return manifestRedirects.map((rule) => ({
+    source: rule.source,
+    destination: rule.destination,
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    regex: rule.regex, // nextjs still generates for manifest file regex to match the route
+    statusCode: rule.statusCode ?? 307,
+    has: rule.has
+  }))
+}
+
 export const getNextCachedRoutesConfig = async (
   outputPath: string,
   appRelativePath: string
-): Promise<{ cachedRoutesMatchers: string[]; rewritesConfig: NextRewrites }> => {
+): Promise<{ cachedRoutesMatchers: string[]; rewritesConfig: NextRewrites; redirectsConfig: NextRedirects }> => {
   const prerenderManifestJSON = await fs.readFile(
     path.join(outputPath, '.next', 'standalone', appRelativePath, '.next', 'prerender-manifest.json'),
     'utf-8'
@@ -95,7 +111,9 @@ export const getNextCachedRoutesConfig = async (
 
   const rewritesConfig = getRewritesConfig(routesManifest.rewrites)
 
-  return { cachedRoutesMatchers, rewritesConfig }
+  const redirectsConfig = getRedirectsConfig(routesManifest.redirects)
+
+  return { cachedRoutesMatchers, rewritesConfig, redirectsConfig }
 }
 
 export const buildApp = async (options: BuildAppOptions) => {
@@ -110,7 +128,10 @@ export const buildApp = async (options: BuildAppOptions) => {
   const appRelativePath = isMonorepo ? path.relative(root, projectPath) : ''
 
   await copyAssets(outputPath, projectPath, appRelativePath)
-  const { cachedRoutesMatchers, rewritesConfig } = await getNextCachedRoutesConfig(outputPath, appRelativePath)
+  const { cachedRoutesMatchers, rewritesConfig, redirectsConfig } = await getNextCachedRoutesConfig(
+    outputPath,
+    appRelativePath
+  )
 
-  return { cachedRoutesMatchers, rewritesConfig }
+  return { cachedRoutesMatchers, rewritesConfig, redirectsConfig }
 }

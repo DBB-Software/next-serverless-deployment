@@ -12,8 +12,8 @@ import { addOutput } from '../../common/cdk'
  * Maps version numbers to their corresponding Amazon Linux 2023 solution stack names
  */
 const NODE_VERSIONS: Record<string, string> = {
-  '18': '64bit Amazon Linux 2023 v6.2.2 running Node.js 18',
-  '20': '64bit Amazon Linux 2023 v6.2.2 running Node.js 20'
+  '18': '64bit Amazon Linux 2023 v6.4.3 running Node.js 18',
+  '20': '64bit Amazon Linux 2023 v6.4.3 running Node.js 20'
 } as const
 
 /**
