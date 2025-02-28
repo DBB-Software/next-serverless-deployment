@@ -208,6 +208,18 @@ export const deploy = async (config: DeployConfig) => {
       folderRootPath: path.join(outputPath, '.next', 'static')
     })
 
+    await uploadFolderToS3(s3Client, {
+      Bucket: nextRenderServerStackOutput.StaticBucketName,
+      Key: 'public',
+      folderRootPath: path.join(
+        outputPath,
+        '.next',
+        'standalone',
+        path.relative(projectSettings.root, projectSettings.projectPath),
+        'public'
+      )
+    })
+
     // upload code version to bucket.
     await uploadFileToS3(s3Client, {
       Bucket: nextRenderServerStackOutput.RenderServerVersionsBucketName,

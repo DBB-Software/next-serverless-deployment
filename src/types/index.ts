@@ -10,6 +10,10 @@ export interface CacheConfig {
 
 export interface DeployConfig {
   cache: CacheConfig
+  publicAssets?: {
+    prefix: string
+    ttl?: number
+  }
 }
 
 export type NextRedirects = Awaited<ReturnType<Required<NextConfig>['redirects']>>

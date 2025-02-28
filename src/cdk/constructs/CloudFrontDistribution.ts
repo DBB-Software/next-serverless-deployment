@@ -4,7 +4,7 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
 import { addOutput } from '../../common/cdk'
-import { CacheConfig } from '../../types'
+import { DeployConfig } from '../../types'
 import { HEADER_DEVICE_TYPE } from '../../constants'
 
 interface CloudFrontPropsDistribution {
@@ -13,7 +13,7 @@ interface CloudFrontPropsDistribution {
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerResponseEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerRequestLambdaEdge: cloudfront.experimental.EdgeFunction
-  cacheConfig: CacheConfig
+  deployConfig: DeployConfig
   imageTTL?: number
 }
 
@@ -35,7 +35,7 @@ export class CloudFrontDistribution extends Construct {
       requestEdgeFunction,
       viewerResponseEdgeFunction,
       viewerRequestLambdaEdge,
-      cacheConfig,
+      deployConfig,
       renderServerDomain,
       imageTTL
     } = props
@@ -43,17 +43,19 @@ export class CloudFrontDistribution extends Construct {
     const splitCachePolicy = new cloudfront.CachePolicy(this, 'SplitCachePolicy', {
       cachePolicyName: `${id}-SplitCachePolicy`,
       queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList(
-        ...defaultNextQueries.concat(cacheConfig.cacheQueries ?? [])
+        ...defaultNextQueries.concat(deployConfig.cache.cacheQueries ?? [])
       ),
-      cookieBehavior: cacheConfig.cacheCookies?.length
-        ? cloudfront.CacheCookieBehavior.allowList(...cacheConfig.cacheCookies)
+      cookieBehavior: deployConfig.cache.cacheCookies?.length
+        ? cloudfront.CacheCookieBehavior.allowList(...deployConfig.cache.cacheCookies)
         : cloudfront.CacheCookieBehavior.none(),
       headerBehavior: cloudfront.CacheHeaderBehavior.allowList(
         ...defaultNextHeaders,
         ...Object.values(HEADER_DEVICE_TYPE)
       ),
       minTtl: NoCache,
-      defaultTtl: NoCache // no caching by default, cache value is going to be used from Cache-Control header.
+      defaultTtl: NoCache, // no caching by default, cache value is going to be used from Cache-Control header.
+      enableAcceptEncodingBrotli: true,
+      enableAcceptEncodingGzip: true
     })
 
     const longCachePolicy = new cloudfront.CachePolicy(this, 'LongCachePolicy', {
@@ -63,7 +65,9 @@ export class CloudFrontDistribution extends Construct {
       headerBehavior: cloudfront.CacheHeaderBehavior.none(),
       defaultTtl: OneMonthCache,
       maxTtl: OneMonthCache,
-      minTtl: OneMonthCache
+      minTtl: OneMonthCache,
+      enableAcceptEncodingBrotli: true,
+      enableAcceptEncodingGzip: true
     })
 
     const imageTTLValue = imageTTL ? Duration.seconds(imageTTL) : OneDayCache
@@ -75,10 +79,24 @@ export class CloudFrontDistribution extends Construct {
       headerBehavior: cloudfront.CacheHeaderBehavior.allowList(...defaultNextHeaders),
       defaultTtl: imageTTLValue,
       maxTtl: imageTTLValue,
-      minTtl: imageTTLValue
+      minTtl: imageTTLValue,
+      enableAcceptEncodingBrotli: true,
+      enableAcceptEncodingGzip: true
+    })
+
+    const publicAssetsCachePolicy = new cloudfront.CachePolicy(this, 'PublicAssetsCachePolicy', {
+      cachePolicyName: `${id}-PublicAssetsCachePolicy`,
+      defaultTtl: deployConfig.publicAssets?.ttl ? Duration.seconds(deployConfig.publicAssets.ttl) : NoCache,
+      maxTtl: deployConfig.publicAssets?.ttl ? Duration.seconds(deployConfig.publicAssets.ttl) : NoCache,
+      minTtl: deployConfig.publicAssets?.ttl ? Duration.seconds(deployConfig.publicAssets.ttl) : NoCache,
+      enableAcceptEncodingBrotli: true,
+      enableAcceptEncodingGzip: true
     })
 
     const s3Origin = new origins.S3Origin(staticBucket)
+    const publicFolderS3Origin = new origins.S3Origin(staticBucket, {
+      originPath: '/public'
+    })
     const nextServerOrigin = new origins.HttpOrigin(renderServerDomain, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: 80
@@ -101,7 +119,8 @@ export class CloudFrontDistribution extends Construct {
             eventType: cloudfront.LambdaEdgeEventType.VIEWER_REQUEST
           }
         ],
-        cachePolicy: splitCachePolicy
+        cachePolicy: splitCachePolicy,
+        compress: true
       },
       defaultRootObject: '',
       additionalBehaviors: {
@@ -113,7 +132,8 @@ export class CloudFrontDistribution extends Construct {
               eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST
             }
           ],
-          cachePolicy: splitCachePolicy
+          cachePolicy: splitCachePolicy,
+          compress: true
         },
         '/_next/image*': {
           origin: nextServerOrigin,
@@ -121,8 +141,17 @@ export class CloudFrontDistribution extends Construct {
         },
         '/_next/*': {
           origin: s3Origin,
-          cachePolicy: longCachePolicy
-        }
+          cachePolicy: longCachePolicy,
+          compress: true
+        },
+        ...(deployConfig.publicAssets
+          ? {
+              [`${deployConfig.publicAssets.prefix}/*`]: {
+                origin: publicFolderS3Origin,
+                cachePolicy: publicAssetsCachePolicy
+              }
+            }
+          : {})
       }
     })
 

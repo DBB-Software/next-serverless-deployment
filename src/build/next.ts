@@ -39,6 +39,9 @@ const copyAssets = async (outputPath: string, appPath: string, appRelativePath: 
       recursive: true
     }
   )
+  await fs.cp(path.join(appPath, 'public'), path.join(outputPath, '.next', 'standalone', appRelativePath, 'public'), {
+    recursive: true
+  })
 }
 
 const getRewritesConfig = (manifestRules: RoutesManifest['rewrites']): NextRewrites => {
