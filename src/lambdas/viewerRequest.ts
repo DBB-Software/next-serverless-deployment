@@ -1,6 +1,7 @@
 import type { CloudFrontRequestCallback, Context, CloudFrontResponseEvent } from 'aws-lambda'
-import type { NextRedirects, NextI18nConfig } from '../types'
+import type { NextRedirects, NextI18nConfig, NextRewrites } from '../types'
 import path from 'node:path'
+import { getUpdatedRoute } from './utils/nextRoute'
 
 /**
  * AWS Lambda@Edge Viewer Request handler for Next.js redirects
@@ -19,46 +20,46 @@ export const handler = async (
   const request = event.Records[0].cf.request
   const redirectsConfig = process.env.REDIRECTS as unknown as NextRedirects
   const localesConfig = process.env.LOCALES_CONFIG as unknown as NextI18nConfig | null
+  const isTrailingSlashEnabled = process.env.IS_TRAILING_SLASH_ENABLED as unknown as boolean
+  const nextRewritesConfig = process.env.NEXT_REWRITES_CONFIG as unknown as NextRewrites
 
   let shouldRedirectWithLocale = false
   let pagePath = request.uri
-  let locale = ''
-  let redirectTo = ''
-  let redirectStatus = '307'
+
+  if (request.uri.startsWith('/api/')) {
+    return callback(null, request)
+  }
 
   if (localesConfig) {
-    const [requestLocale, ...restPath] = request.uri.substring(1).split('/')
-    shouldRedirectWithLocale = !localesConfig.locales.find((locale) => locale === requestLocale)
+    const [requestLocale] = request.uri.substring(1).split('/')
+    shouldRedirectWithLocale = !localesConfig.locales.includes(requestLocale)
 
-    if (!shouldRedirectWithLocale) {
-      pagePath = `/${restPath.join('/')}`
-      locale = requestLocale
-    } else {
-      locale = localesConfig.defaultLocale
+    if (shouldRedirectWithLocale) {
+      pagePath = path.join(`/${localesConfig.defaultLocale}`, pagePath)
     }
   }
 
-  const redirect = redirectsConfig.find((r) => r.source === pagePath)
+  const redirectDestintaion = getUpdatedRoute({ ...request, uri: pagePath }, redirectsConfig, isTrailingSlashEnabled)
 
-  if (redirect) {
-    redirectTo = locale ? `/${path.join(locale, redirect.destination)}` : redirect.destination
-    redirectStatus = redirect.statusCode ? String(redirect.statusCode) : redirect.permanent ? '308' : '307'
-  } else if (shouldRedirectWithLocale) {
-    redirectTo = `/${path.join(locale, pagePath)}`
-  }
+  if (redirectDestintaion || shouldRedirectWithLocale) {
+    const redirectPath = redirectDestintaion ? redirectDestintaion.newUrl : pagePath
+    const statusCode =
+      redirectDestintaion && 'statusCode' in redirectDestintaion.rule
+        ? String(redirectDestintaion.rule.statusCode)
+        : '307'
 
-  if (redirectTo) {
     return callback(null, {
-      status: redirectStatus,
+      status: statusCode,
       headers: {
-        location: [
-          {
-            key: 'Location',
-            value: `${redirectTo}${request.querystring ? `?${request.querystring}` : ''}`
-          }
-        ]
+        location: [{ key: 'Location', value: redirectPath }]
       }
     })
+  }
+
+  const rewrittenDestination = getUpdatedRoute(request, nextRewritesConfig, isTrailingSlashEnabled)
+
+  if (rewrittenDestination) {
+    request.uri = rewrittenDestination.newUrl
   }
 
   return callback(null, request)

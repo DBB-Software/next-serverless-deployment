@@ -6,7 +6,7 @@ import * as logs from 'aws-cdk-lib/aws-logs'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
 import { buildLambda } from '../../common/esbuild'
-import { CacheConfig, NextRewrites } from '../../types'
+import { CacheConfig } from '../../types'
 
 interface OriginRequestLambdaEdgeProps extends cdk.StackProps {
   bucketName: string
@@ -16,7 +16,6 @@ interface OriginRequestLambdaEdgeProps extends cdk.StackProps {
   cacheConfig: CacheConfig
   bucketRegion?: string
   cachedRoutesMatchers: string[]
-  rewritesConfig: NextRewrites
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -28,16 +27,8 @@ export class OriginRequestLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: OriginRequestLambdaEdgeProps) {
-    const {
-      bucketName,
-      bucketRegion,
-      renderServerDomain,
-      nodejs,
-      buildOutputPath,
-      cacheConfig,
-      cachedRoutesMatchers,
-      rewritesConfig
-    } = props
+    const { bucketName, bucketRegion, renderServerDomain, nodejs, buildOutputPath, cacheConfig, cachedRoutesMatchers } =
+      props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -49,8 +40,7 @@ export class OriginRequestLambdaEdge extends Construct {
         'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
         'process.env.EB_APP_URL': JSON.stringify(renderServerDomain),
         'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig),
-        'process.env.NEXT_CACHED_ROUTES_MATCHERS': JSON.stringify(cachedRoutesMatchers ?? []),
-        'process.env.NEXT_REWRITES_CONFIG': JSON.stringify(rewritesConfig ?? [])
+        'process.env.NEXT_CACHED_ROUTES_MATCHERS': JSON.stringify(cachedRoutesMatchers ?? [])
       }
     })
 

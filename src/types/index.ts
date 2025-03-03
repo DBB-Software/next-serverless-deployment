@@ -16,8 +16,6 @@ export interface DeployConfig {
   }
 }
 
-export type NextRedirects = Awaited<ReturnType<Required<NextConfig>['redirects']>>
-
 export type NextI18nConfig = NextConfig['i18n']
 
 export type NextRewriteEntity = {
@@ -27,4 +25,14 @@ export type NextRewriteEntity = {
   has?: RouteHas[]
 }
 
+export type NextRedirectEntity = {
+  source: string
+  destination: string
+  has?: RouteHas[]
+  regex: string
+  statusCode: number
+}
+
 export type NextRewrites = NextRewriteEntity[]
+
+export type NextRedirects = NextRedirectEntity[]

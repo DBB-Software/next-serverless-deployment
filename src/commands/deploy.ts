@@ -85,8 +85,8 @@ export const deploy = async (config: DeployConfig) => {
     const deployConfig = await loadConfig()
 
     const nextConfig = (await loadFile(projectSettings.nextConfigPath)) as NextConfig
-    const nextRedirects = nextConfig.redirects ? await nextConfig.redirects() : undefined
     const nextI18nConfig = nextConfig.i18n
+    const isTrailingSlashEnabled = nextConfig.trailingSlash ?? false
 
     const outputPath = createOutputFolder()
 
@@ -113,7 +113,7 @@ export const deploy = async (config: DeployConfig) => {
     const siteNameLowerCased = siteName.toLowerCase()
 
     // Build and zip app.
-    const { cachedRoutesMatchers, rewritesConfig } = await buildApp({
+    const { cachedRoutesMatchers, rewritesConfig, redirectsConfig } = await buildApp({
       projectSettings,
       outputPath
     })
@@ -156,9 +156,10 @@ export const deploy = async (config: DeployConfig) => {
         deployConfig,
         imageTTL: nextConfig.imageTTL,
         nextI18nConfig,
-        redirects: nextRedirects,
+        redirectsConfig,
         cachedRoutesMatchers,
         rewritesConfig,
+        isTrailingSlashEnabled,
         env: {
           region: AWS_EDGE_REGION // required since Edge can be deployed only here.
         }
