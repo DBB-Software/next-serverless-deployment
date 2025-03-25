@@ -2,6 +2,7 @@ import { Construct } from 'constructs'
 import { Duration } from 'aws-cdk-lib'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as s3 from 'aws-cdk-lib/aws-s3'
+import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
 import { addOutput } from '../../common/cdk'
 import { DeployConfig } from '../../types'
@@ -13,6 +14,7 @@ interface CloudFrontPropsDistribution {
   requestEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerResponseEdgeFunction: cloudfront.experimental.EdgeFunction
   viewerRequestLambdaEdge: cloudfront.experimental.EdgeFunction
+  revalidateLambdaUrl: lambda.FunctionUrl
   deployConfig: DeployConfig
   imageTTL?: number
 }
@@ -35,6 +37,7 @@ export class CloudFrontDistribution extends Construct {
       requestEdgeFunction,
       viewerResponseEdgeFunction,
       viewerRequestLambdaEdge,
+      revalidateLambdaUrl,
       deployConfig,
       renderServerDomain,
       imageTTL
@@ -102,6 +105,8 @@ export class CloudFrontDistribution extends Construct {
       httpPort: 80
     })
 
+    const revalidateLambdaOrigin = new origins.FunctionUrlOrigin(revalidateLambdaUrl)
+
     this.cf = new cloudfront.Distribution(this, id, {
       defaultBehavior: {
         origin: s3Origin,
@@ -134,6 +139,13 @@ export class CloudFrontDistribution extends Construct {
           ],
           cachePolicy: splitCachePolicy,
           compress: true
+        },
+        '/_next/revalidate': {
+          origin: revalidateLambdaOrigin,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.ALLOW_ALL,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL
         },
         '/_next/image*': {
           origin: nextServerOrigin,

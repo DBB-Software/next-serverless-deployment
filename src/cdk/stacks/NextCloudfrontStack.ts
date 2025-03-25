@@ -5,7 +5,10 @@ import { OriginRequestLambdaEdge } from '../constructs/OriginRequestLambdaEdge'
 import { CloudFrontDistribution } from '../constructs/CloudFrontDistribution'
 import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge'
 import { ViewerRequestLambdaEdge } from '../constructs/ViewerRequestLambdaEdge'
+import { RevalidateLambda } from '../constructs/RevalidateLambda'
+import { SecretManagerDistribution } from '../constructs/SecretManagerDistribution'
 import { DeployConfig, NextRedirects, NextI18nConfig, NextRewrites } from '../../types'
+import * as iam from 'aws-cdk-lib/aws-iam'
 
 export interface NextCloudfrontStackProps extends StackProps {
   nodejs?: string
@@ -20,6 +23,8 @@ export interface NextCloudfrontStackProps extends StackProps {
   cachedRoutesMatchers: string[]
   rewritesConfig: NextRewrites
   isTrailingSlashEnabled: boolean
+  sqsQueueUrl: string
+  sqsQueueArn: string
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -27,7 +32,7 @@ export class NextCloudfrontStack extends Stack {
   public readonly viewerResponseLambdaEdge: ViewerResponseLambdaEdge
   public readonly viewerRequestLambdaEdge: ViewerRequestLambdaEdge
   public readonly cloudfront: CloudFrontDistribution
-
+  public readonly revalidateLambda: RevalidateLambda
   constructor(scope: Construct, id: string, props: NextCloudfrontStackProps) {
     super(scope, id, props)
     const {
@@ -42,7 +47,9 @@ export class NextCloudfrontStack extends Stack {
       cachedRoutesMatchers,
       nextI18nConfig,
       rewritesConfig,
-      isTrailingSlashEnabled
+      isTrailingSlashEnabled,
+      sqsQueueUrl,
+      sqsQueueArn
     } = props
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
@@ -69,10 +76,28 @@ export class NextCloudfrontStack extends Stack {
       buildOutputPath
     })
 
+    this.revalidateLambda = new RevalidateLambda(this, `${id}-RevalidateLambda`, {
+      nodejs,
+      buildOutputPath,
+      sqsRegion: region,
+      sqsQueueUrl
+    })
+
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
       bucketName: staticBucketName,
       region
     })
+
+    const secretManager = new SecretManagerDistribution(this, `${id}-SecretManagerDistribution`)
+
+    secretManager.xApiKey.grantRead(this.revalidateLambda.lambda)
+
+    this.revalidateLambda.lambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['sqs:SendMessage'],
+        resources: [sqsQueueArn]
+      })
+    )
 
     this.cloudfront = new CloudFrontDistribution(this, `${id}-NextCloudFront`, {
       staticBucket,
@@ -80,6 +105,7 @@ export class NextCloudfrontStack extends Stack {
       requestEdgeFunction: this.originRequestLambdaEdge.lambdaEdge,
       viewerResponseEdgeFunction: this.viewerResponseLambdaEdge.lambdaEdge,
       viewerRequestLambdaEdge: this.viewerRequestLambdaEdge.lambdaEdge,
+      revalidateLambdaUrl: this.revalidateLambda.lambdaHttpUrl,
       deployConfig: deployConfig,
       imageTTL
     })
