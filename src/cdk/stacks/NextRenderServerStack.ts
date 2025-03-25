@@ -120,6 +120,14 @@ export class NextRenderServerStack extends cdk.Stack {
       })
     )
 
+    this.renderWorker.instanceRole.addToPolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ['cloudfront:CreateInvalidation'],
+        resources: ['*'],
+        effect: iam.Effect.ALLOW
+      })
+    )
+
     addOutput(this, `${id}-StaticBucketName`, this.staticBucket.bucketName)
     addOutput(this, `${id}-DynamoDBTableName`, this.dynamoDB.table.tableName)
   }

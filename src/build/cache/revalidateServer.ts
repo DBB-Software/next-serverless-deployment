@@ -22,8 +22,20 @@ const s3Client = new S3Client({ region: process.env.AWS_REGION })
 const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION })
 const cloudfrontClient = new CloudFrontClient({ region: process.env.AWS_REGION })
 
+function transformPathPattern(pattern: string) {
+  const cleanedPattern = pattern.startsWith('/') ? pattern.slice(1) : pattern
+  const hasWildcard = cleanedPattern.includes('*')
+  const prefix = cleanedPattern.split('*')[0]
+  const minimatchString = hasWildcard
+    ? cleanedPattern.replace(/\/\*/g, '/**')
+    : cleanedPattern.endsWith('/')
+      ? cleanedPattern + '*'
+      : cleanedPattern + '/*'
+  return { prefix, hasWildcard, minimatchString }
+}
+
 async function listS3Objects(pattern: string) {
-  const prefix = pattern.split('*')[0]
+  const { prefix, minimatchString } = transformPathPattern(pattern)
 
   const { Contents = [] } = await s3Client.send(
     new ListObjectsV2Command({
@@ -32,11 +44,14 @@ async function listS3Objects(pattern: string) {
     })
   )
 
-  return Contents.filter((obj) => obj.Key && minimatch(obj.Key, pattern)).map((obj) => ({ Key: obj.Key! }))
+  return Contents.filter((obj) => obj.Key && minimatch(obj.Key, minimatchString)).map((obj) => ({
+    Key: obj.Key!
+  }))
 }
 
 async function listDynamoItems(pattern: string): Promise<{ key: Record<string, AttributeValue> }[]> {
-  const prefix = pattern.split('*')[0]
+  const { prefix, minimatchString } = transformPathPattern(pattern)
+
   const { Items = [] } = await dynamoClient.send(
     new ScanCommand({
       TableName: process.env.DYNAMODB_CACHE_TABLE,
@@ -47,7 +62,7 @@ async function listDynamoItems(pattern: string): Promise<{ key: Record<string, A
     })
   )
 
-  return Items.filter((item) => item.pageKey?.S && minimatch(item.pageKey.S, pattern)).map((item) => ({
+  return Items.filter((item) => item.pageKey?.S && minimatch(item.pageKey.S, minimatchString)).map((item) => ({
     key: { pageKey: item.pageKey }
   }))
 }
@@ -103,11 +118,6 @@ function categorizePaths(paths: string[]) {
 }
 
 async function revalidateNextPages(paths: string[]) {
-  await Promise.all([
-    deleteS3Objects(paths.map((path) => ({ Key: path }))),
-    deleteDynamoItems(paths.map((path) => ({ key: { pageKey: { S: path } } })))
-  ])
-
   await Promise.all(
     paths.map((path) =>
       http.get({

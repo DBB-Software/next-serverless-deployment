@@ -264,7 +264,14 @@ export const deploy = async (config: DeployConfig) => {
     await ebClient.updateEnvironment({
       ApplicationName: nextRenderServerStackOutput.RenderWorkerApplicationName,
       EnvironmentName: nextRenderServerStackOutput.RenderWorkerEnvironmentName,
-      VersionLabel: versionLabel
+      VersionLabel: versionLabel,
+      OptionSettings: [
+        {
+          Namespace: 'aws:elasticbeanstalk:application:environment',
+          OptionName: 'CLOUDFRONT_DISTRIBUTION_ID',
+          Value: nextCloudfrontStackOutput.CloudfrontDistributionId!
+        }
+      ]
     })
 
     await cloudfrontClient.createInvalidation({
