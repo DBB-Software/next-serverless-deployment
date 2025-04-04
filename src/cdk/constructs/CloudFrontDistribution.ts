@@ -24,7 +24,7 @@ const OneMonthCache = Duration.days(30)
 const NoCache = Duration.seconds(0)
 
 const defaultNextQueries = ['_rsc']
-const defaultNextHeaders = ['Cache-Control', 'Next-Router-State-Tree', 'Next-Url', 'Rsc', 'Next-Router-Prefetch']
+const defaultNextHeaders = ['Next-Router-State-Tree', 'Next-Url', 'Rsc', 'Next-Router-Prefetch']
 const imageQueries = ['w', 'h', 'url', 'q']
 export class CloudFrontDistribution extends Construct {
   public readonly cf: cloudfront.Distribution

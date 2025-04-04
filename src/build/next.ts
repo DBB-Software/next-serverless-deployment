@@ -98,10 +98,16 @@ export const getNextCachedRoutesConfig = async (
   const prerenderManifest = JSON.parse(prerenderManifestJSON) as PrerenderManifest
   const routesManifest = JSON.parse(routesManifestJSON) as RoutesManifest
 
+  const locales = routesManifest.i18n?.locales ?? []
+
   const cachedRoutesMatchers = [...routesManifest.dynamicRoutes, ...routesManifest.staticRoutes].reduce(
     (prev, route) => {
       if (prerenderManifest.routes?.[route.page] || prerenderManifest.dynamicRoutes?.[route.page]) {
-        prev.push(route.regex)
+        if (locales.length) {
+          prev.push(...locales.map((locale) => route.regex.replace('^', `^/${locale}`)))
+        } else {
+          prev.push(route.regex)
+        }
       }
 
       return prev
