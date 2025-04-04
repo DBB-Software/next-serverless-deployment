@@ -133,6 +133,7 @@ export const deploy = async (config: DeployConfig) => {
         renderServerInstanceType,
         renderServerMaxInstances,
         renderServerMinInstances,
+        healthCheckPath: deployConfig.healthCheckPath,
         env: {
           region
         }

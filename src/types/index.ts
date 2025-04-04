@@ -10,6 +10,7 @@ export interface CacheConfig {
 
 export interface DeployConfig {
   cache: CacheConfig
+  healthCheckPath?: string
   publicAssets?: {
     prefix: string
     ttl?: number

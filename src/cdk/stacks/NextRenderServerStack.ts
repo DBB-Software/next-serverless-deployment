@@ -16,6 +16,7 @@ export interface NextRenderServerStackProps extends cdk.StackProps {
   renderServerInstanceType?: string
   renderServerMinInstances?: number
   renderServerMaxInstances?: number
+  healthCheckPath?: string
 }
 
 export class NextRenderServerStack extends cdk.Stack {
@@ -35,7 +36,8 @@ export class NextRenderServerStack extends cdk.Stack {
       region,
       renderServerInstanceType,
       renderServerMinInstances,
-      renderServerMaxInstances
+      renderServerMaxInstances,
+      healthCheckPath
     } = props
 
     this.staticBucketName = `${id}-static`
@@ -68,7 +70,8 @@ export class NextRenderServerStack extends cdk.Stack {
       instanceType: renderServerInstanceType,
       minInstances: renderServerMinInstances,
       maxInstances: renderServerMaxInstances,
-      dynamoDBCacheTable: this.dynamoDB.table.tableName
+      dynamoDBCacheTable: this.dynamoDB.table.tableName,
+      healthCheckPath
     })
 
     this.renderWorker = new RenderWorkerDistribution(this, `${id}-renderWorker`, {

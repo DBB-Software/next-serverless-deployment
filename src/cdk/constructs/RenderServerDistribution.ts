@@ -17,6 +17,7 @@ interface RenderServerDistributionProps {
   minInstances?: number
   maxInstances?: number
   dynamoDBCacheTable: string
+  healthCheckPath?: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, string> = {
@@ -46,7 +47,8 @@ export class RenderServerDistribution extends Construct {
       instanceType = 't2.micro',
       minInstances = 1,
       maxInstances = 2,
-      dynamoDBCacheTable
+      dynamoDBCacheTable,
+      healthCheckPath = '/'
     } = props
 
     this.vpc = new Vpc(this, 'BeanstalkVPC', {
@@ -81,6 +83,13 @@ export class RenderServerDistribution extends Construct {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkWebTier')]
     })
+
+    this.ebInstanceProfileRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['logs:PutLogEvents', 'logs:CreateLogStream', 'logs:DescribeLogGroups', 'logs:DescribeLogStreams'],
+        resources: ['*']
+      })
+    )
 
     this.ebInstanceProfileRole.addToPolicy(
       new iam.PolicyStatement({
@@ -132,6 +141,11 @@ export class RenderServerDistribution extends Construct {
           value: 'application'
         },
         {
+          namespace: 'aws:elasticbeanstalk:environment:process:default',
+          optionName: 'HealthCheckPath',
+          value: healthCheckPath
+        },
+        {
           namespace: 'aws:autoscaling:launchconfiguration',
           optionName: 'InstanceType',
           value: instanceType
@@ -174,12 +188,12 @@ export class RenderServerDistribution extends Construct {
         {
           namespace: 'aws:autoscaling:trigger',
           optionName: 'UpperThreshold',
-          value: '75'
+          value: '60'
         },
         {
           namespace: 'aws:autoscaling:trigger',
           optionName: 'LowerThreshold',
-          value: '40'
+          value: '30'
         },
         {
           namespace: 'aws:ec2:vpc',
@@ -195,6 +209,11 @@ export class RenderServerDistribution extends Construct {
           namespace: 'aws:ec2:vpc',
           optionName: 'ELBSubnets',
           value: publicSubnets.join(',')
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:cloudwatch:logs',
+          optionName: 'StreamLogs',
+          value: 'true'
         }
       ]
     })
