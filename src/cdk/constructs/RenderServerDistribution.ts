@@ -79,7 +79,7 @@ export class RenderServerDistribution extends Construct {
       applicationName: `${id}-eb-app`
     })
 
-    this.ebInstanceProfileRole = new iam.Role(this, 'EbInstanceProfileRole', {
+    this.ebInstanceProfileRole = new iam.Role(this, 'ProfileRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkWebTier')]
     })
@@ -98,7 +98,7 @@ export class RenderServerDistribution extends Construct {
       })
     )
 
-    this.ebInstanceProfile = new iam.CfnInstanceProfile(this, 'EbInstanceProfile', {
+    this.ebInstanceProfile = new iam.CfnInstanceProfile(this, 'Profile', {
       roles: [this.ebInstanceProfileRole.roleName]
     })
 
@@ -111,7 +111,7 @@ export class RenderServerDistribution extends Construct {
     const privateSubnets = this.vpc.selectSubnets({ subnetType: SubnetType.PRIVATE_WITH_EGRESS }).subnetIds
 
     this.ebEnv = new elasticbeanstalk.CfnEnvironment(this, 'EbEnv', {
-      environmentName: `${appName}-eb-env`,
+      environmentName: `${appName}-env`,
       applicationName: this.ebApp.applicationName!,
       solutionStackName: nodeJSEnvironment,
       optionSettings: [

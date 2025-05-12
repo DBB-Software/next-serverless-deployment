@@ -152,7 +152,7 @@ export class RenderWorkerDistribution extends Construct {
      * Create IAM role for EC2 instances
      * Includes required permissions for Elastic Beanstalk Worker tier
      */
-    this.instanceRole = new iam.Role(this, 'WorkerInstanceRole', {
+    this.instanceRole = new iam.Role(this, 'InstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkWorkerTier')]
     })
@@ -187,7 +187,7 @@ export class RenderWorkerDistribution extends Construct {
     /**
      * Create Instance Profile for EC2 instances
      */
-    this.instanceProfile = new iam.CfnInstanceProfile(this, 'WorkerInstanceProfile', {
+    this.instanceProfile = new iam.CfnInstanceProfile(this, 'Profile', {
       roles: [this.instanceRole.roleName]
     })
 
@@ -210,7 +210,7 @@ export class RenderWorkerDistribution extends Construct {
      * Create Elastic Beanstalk environment with worker configuration
      */
     this.environment = new elasticbeanstalk.CfnEnvironment(this, 'WorkerEnvironment', {
-      environmentName: `${appName}-worker-env`,
+      environmentName: appName,
       applicationName: this.application.applicationName!,
       solutionStackName: NODE_VERSIONS[nodejs],
       tier: {

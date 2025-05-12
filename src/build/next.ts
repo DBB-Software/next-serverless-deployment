@@ -1,5 +1,6 @@
 import childProcess from 'node:child_process'
-import fs from 'fs/promises'
+import fsPromises from 'fs/promises'
+import fs from 'node:fs'
 import path from 'node:path'
 import type { PrerenderManifest, RoutesManifest } from 'next/dist/build'
 import { type ProjectPackager, type ProjectSettings } from '../common/project'
@@ -16,6 +17,22 @@ interface BuildAppOptions {
 
 export const OUTPUT_FOLDER = 'serverless-next'
 
+export const cleanOutputFolder = () => {
+  const outputFolderPath = path.join(process.cwd(), OUTPUT_FOLDER)
+
+  fs.rmSync(outputFolderPath, { recursive: true, force: true })
+}
+
+export const createOutputFolder = () => {
+  const outputFolderPath = path.join(process.cwd(), OUTPUT_FOLDER)
+  // clean folder before creating new build output.
+  cleanOutputFolder()
+
+  fs.mkdirSync(outputFolderPath)
+
+  return outputFolderPath
+}
+
 const setNextEnvs = () => {
   process.env.NEXT_SERVERLESS_DEPLOYING_PHASE = 'true'
 }
@@ -29,19 +46,23 @@ export const buildNext = async (options: BuildOptions) => {
 
 const copyAssets = async (outputPath: string, appPath: string, appRelativePath: string) => {
   // Copying static assets (like js, css, images, .etc)
-  await fs.cp(path.join(appPath, '.next'), path.join(outputPath, '.next'), {
+  await fsPromises.cp(path.join(appPath, '.next'), path.join(outputPath, '.next'), {
     recursive: true
   })
-  await fs.cp(
+  await fsPromises.cp(
     path.join(appPath, '.next', 'static'),
     path.join(outputPath, '.next', 'standalone', appRelativePath, '.next', 'static'),
     {
       recursive: true
     }
   )
-  await fs.cp(path.join(appPath, 'public'), path.join(outputPath, '.next', 'standalone', appRelativePath, 'public'), {
-    recursive: true
-  })
+  await fsPromises.cp(
+    path.join(appPath, 'public'),
+    path.join(outputPath, '.next', 'standalone', appRelativePath, 'public'),
+    {
+      recursive: true
+    }
+  )
 }
 
 const getRewritesConfig = (manifestRules: RoutesManifest['rewrites']): NextRewrites => {
@@ -86,11 +107,11 @@ export const getNextCachedRoutesConfig = async (
   outputPath: string,
   appRelativePath: string
 ): Promise<{ cachedRoutesMatchers: string[]; rewritesConfig: NextRewrites; redirectsConfig: NextRedirects }> => {
-  const prerenderManifestJSON = await fs.readFile(
+  const prerenderManifestJSON = await fsPromises.readFile(
     path.join(outputPath, '.next', 'standalone', appRelativePath, '.next', 'prerender-manifest.json'),
     'utf-8'
   )
-  const routesManifestJSON = await fs.readFile(
+  const routesManifestJSON = await fsPromises.readFile(
     path.join(outputPath, '.next', 'standalone', appRelativePath, '.next', 'routes-manifest.json'),
     'utf-8'
   )

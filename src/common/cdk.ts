@@ -10,10 +10,10 @@ import {
   waitUntilStackCreateComplete,
   waitUntilStackDeleteComplete,
   waitUntilStackUpdateComplete,
-  GetTemplateCommand
+  GetTemplateCommand,
+  Stack
 } from '@aws-sdk/client-cloudformation'
 import path from 'node:path'
-import isEqual from 'lodash/isEqual'
 
 import { getCDKAssetsPublisher } from './aws'
 
@@ -64,11 +64,6 @@ export class AppStack<T extends cdk.Stack, U> {
 
   public static CLOUDFORMATION_STACK_WAIT_TIME_SEC = 30 * 60 // 30 minutes
 
-  public describeCurrentStack = async () => {
-    const command = new DescribeStacksCommand({ StackName: this.stackName })
-
-    return this.cfClient.send(command).then((r) => r?.Stacks?.[0])
-  }
   public getCurrentStackTemplate = async () => {
     const command = new GetTemplateCommand({ StackName: this.stackName })
 
@@ -76,15 +71,15 @@ export class AppStack<T extends cdk.Stack, U> {
     return response.TemplateBody || ''
   }
 
-  public checkIfStackExists = async () => {
+  public describeCurrentStack = async () => {
     try {
-      const res = await this.describeCurrentStack()
+      const command = new DescribeStacksCommand({ StackName: this.stackName })
 
-      return !!res
+      return await this.cfClient.send(command).then((r) => r?.Stacks?.[0])
     } catch (err) {
       if (err instanceof CloudFormationServiceException) {
         if (err.name === 'ValidationError') {
-          return false
+          return null
         }
       }
 
@@ -132,29 +127,8 @@ export class AppStack<T extends cdk.Stack, U> {
     )
   }
 
-  public deployStack = async (): Promise<Record<string, string>> => {
-    const { buildOutputPath, region, profile } = this.options
-
-    const assetsPublisher = getCDKAssetsPublisher(path.join(buildOutputPath, `${this.stackName}.assets.json`), {
-      region: region,
-      profile: profile
-    })
-    await assetsPublisher.publish()
-
-    const ifStackExists = await this.checkIfStackExists()
-
-    if (ifStackExists) {
-      const currentTemplate = await this.getCurrentStackTemplate()
-      if (!isEqual(JSON.parse(currentTemplate), this.stackTemplate)) {
-        await this.updateStack()
-      }
-    } else {
-      await this.createStack()
-    }
-
-    const currentStackInfo = await this.describeCurrentStack()
-
-    return (currentStackInfo?.Outputs ?? []).reduce((prev: Record<string, string>, curr) => {
+  public static transformStackOutput = (stack?: Stack | null) => {
+    return (stack?.Outputs ?? []).reduce((prev: Record<string, string>, curr) => {
       const key = curr.ExportName!.split('-').pop()!
 
       return {
@@ -162,5 +136,26 @@ export class AppStack<T extends cdk.Stack, U> {
         [key]: curr.OutputValue!
       }
     }, {})
+  }
+
+  public deployStack = async (): Promise<Record<string, string>> => {
+    const { buildOutputPath, region, profile } = this.options
+    const assetsPublisher = getCDKAssetsPublisher(path.join(buildOutputPath, `${this.stackName}.assets.json`), {
+      region: region,
+      profile: profile
+    })
+    await assetsPublisher.publish()
+
+    let currentStackInfo = await this.describeCurrentStack()
+
+    if (currentStackInfo) {
+      return AppStack.transformStackOutput(currentStackInfo)
+    }
+
+    await this.createStack()
+
+    currentStackInfo = await this.describeCurrentStack()
+
+    return AppStack.transformStackOutput(currentStackInfo)
   }
 }

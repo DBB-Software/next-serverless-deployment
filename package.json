@@ -65,6 +65,7 @@
     "@aws-sdk/client-cloudfront": "3.590.0",
     "@aws-sdk/client-dynamodb": "3.709.0",
     "@aws-sdk/client-elastic-beanstalk": "3.590.0",
+    "@aws-sdk/client-lambda": "3.787.0",
     "@aws-sdk/client-s3": "3.591.0",
     "@aws-sdk/client-secrets-manager": "3.758.0",
     "@aws-sdk/client-sqs": "3.682.0",
