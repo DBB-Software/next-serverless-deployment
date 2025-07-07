@@ -6,16 +6,12 @@ import * as logs from 'aws-cdk-lib/aws-logs'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
 import { buildLambda } from '../../common/esbuild'
-import { CacheConfig } from '../../types'
+import { addOutput } from '../../common/cdk'
 
 interface OriginRequestLambdaEdgeProps extends cdk.StackProps {
   bucketName: string
-  renderServerDomain: string
   buildOutputPath: string
   nodejs?: string
-  cacheConfig: CacheConfig
-  bucketRegion?: string
-  cachedRoutesMatchers: string[]
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -27,22 +23,12 @@ export class OriginRequestLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: OriginRequestLambdaEdgeProps) {
-    const { bucketName, bucketRegion, renderServerDomain, nodejs, buildOutputPath, cacheConfig, cachedRoutesMatchers } =
-      props
+    const { bucketName, nodejs, buildOutputPath } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
-    const name = 'originRequest'
 
-    buildLambda(name, buildOutputPath, {
-      define: {
-        'process.env.S3_BUCKET': JSON.stringify(bucketName),
-        'process.env.S3_BUCKET_REGION': JSON.stringify(bucketRegion ?? ''),
-        'process.env.EB_APP_URL': JSON.stringify(renderServerDomain),
-        'process.env.CACHE_CONFIG': JSON.stringify(cacheConfig),
-        'process.env.NEXT_CACHED_ROUTES_MATCHERS': JSON.stringify(cachedRoutesMatchers ?? [])
-      }
-    })
+    buildLambda('defaultLambdaMock', buildOutputPath)
 
     const logGroup = new logs.LogGroup(this, 'OriginRequestLambdaEdgeLogGroup', {
       logGroupName: `/aws/lambda/${id}-originRequest`,
@@ -52,7 +38,7 @@ export class OriginRequestLambdaEdge extends Construct {
 
     this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'OriginRequestLambdaEdge', {
       runtime: nodeJSEnvironment,
-      code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', name)),
+      code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', 'defaultLambdaMock')),
       handler: 'index.handler',
       logGroup
     })
@@ -65,5 +51,7 @@ export class OriginRequestLambdaEdge extends Construct {
     })
 
     this.lambdaEdge.addToRolePolicy(policyStatement)
+
+    addOutput(this, `${id}-OriginRequestLambdaEdgeName`, this.lambdaEdge.functionName)
   }
 }

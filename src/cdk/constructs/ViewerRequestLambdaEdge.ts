@@ -6,15 +6,11 @@ import * as logs from 'aws-cdk-lib/aws-logs'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import path from 'node:path'
 import { buildLambda } from '../../common/esbuild'
-import { NextRedirects, NextI18nConfig, NextRewrites } from '../../types'
+import { addOutput } from '../../common/cdk'
 
 interface ViewerRequestLambdaEdgeProps extends cdk.StackProps {
   buildOutputPath: string
   nodejs?: string
-  redirectsConfig?: NextRedirects
-  nextI18nConfig?: NextI18nConfig
-  isTrailingSlashEnabled: boolean
-  rewritesConfig: NextRewrites
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -26,20 +22,12 @@ export class ViewerRequestLambdaEdge extends Construct {
   public readonly lambdaEdge: cloudfront.experimental.EdgeFunction
 
   constructor(scope: Construct, id: string, props: ViewerRequestLambdaEdgeProps) {
-    const { nodejs, buildOutputPath, redirectsConfig, nextI18nConfig, isTrailingSlashEnabled, rewritesConfig } = props
+    const { nodejs, buildOutputPath } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
-    const name = 'viewerRequest'
 
-    buildLambda(name, buildOutputPath, {
-      define: {
-        'process.env.REDIRECTS': JSON.stringify(redirectsConfig ?? []),
-        'process.env.LOCALES_CONFIG': JSON.stringify(nextI18nConfig ?? null),
-        'process.env.IS_TRAILING_SLASH_ENABLED': JSON.stringify(isTrailingSlashEnabled),
-        'process.env.NEXT_REWRITES_CONFIG': JSON.stringify(rewritesConfig ?? [])
-      }
-    })
+    buildLambda('defaultLambdaMock', buildOutputPath)
 
     const logGroup = new logs.LogGroup(this, 'ViewerRequestLambdaEdgeLogGroup', {
       logGroupName: `/aws/lambda/${id}-viewerRequest`,
@@ -49,7 +37,7 @@ export class ViewerRequestLambdaEdge extends Construct {
 
     this.lambdaEdge = new cloudfront.experimental.EdgeFunction(this, 'ViewerRequestLambdaEdge', {
       runtime: nodeJSEnvironment,
-      code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', name)),
+      code: lambda.Code.fromAsset(path.join(buildOutputPath, 'server-functions', 'defaultLambdaMock')),
       handler: 'index.handler',
       logGroup
     })
@@ -62,5 +50,7 @@ export class ViewerRequestLambdaEdge extends Construct {
     })
 
     this.lambdaEdge.addToRolePolicy(policyStatement)
+
+    addOutput(this, `${id}-ViewerRequestLambdaEdgeName`, this.lambdaEdge.functionName)
   }
 }

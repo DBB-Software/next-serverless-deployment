@@ -3,6 +3,7 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { deploy } from './deploy'
 import { bootstrap } from './bootstrap'
+import { createApp } from './createApp'
 
 interface CLIOptions {
   siteName: string
@@ -38,15 +39,14 @@ cli.command<CLIOptions>(
 
 cli
   .command<CLIOptions>(
-    'deploy',
-    'app deployment',
+    'createApp',
+    'creates application stack',
     () => {},
     async (argv) => {
       const {
-        siteName,
-        stage,
-        region,
         profile,
+        region,
+        siteName,
         nodejs,
         production,
         renderServerInstanceType,
@@ -54,18 +54,15 @@ cli
         renderServerMaxInstances
       } = argv
 
-      await deploy({
+      await createApp({
+        profile,
+        region,
         siteName,
-        stage,
         nodejs,
         isProduction: production,
         renderServerInstanceType,
         renderServerMinInstances,
-        renderServerMaxInstances,
-        aws: {
-          region,
-          profile
-        }
+        renderServerMaxInstances
       })
     }
   )
@@ -97,6 +94,34 @@ cli
   .option('renderServerMaxInstances', {
     type: 'number',
     describe: 'Set max render server instances. Default is 2.'
+  })
+
+cli
+  .command<CLIOptions>(
+    'deploy',
+    'app deployment',
+    () => {},
+    async (argv) => {
+      const { siteName, stage, region, profile } = argv
+
+      await deploy({
+        siteName,
+        stage,
+        aws: {
+          region,
+          profile
+        }
+      })
+    }
+  )
+  .option('siteName', {
+    type: 'string',
+    requiresArg: true,
+    describe: 'The name is used to create CDK stack and components.'
+  })
+  .option('stage', {
+    type: 'string',
+    describe: 'The stage of the app, defaults to production'
   })
 
 cli.help()

@@ -7,7 +7,7 @@ import { ViewerResponseLambdaEdge } from '../constructs/ViewerResponseLambdaEdge
 import { ViewerRequestLambdaEdge } from '../constructs/ViewerRequestLambdaEdge'
 import { RevalidateLambda } from '../constructs/RevalidateLambda'
 import { SecretManagerDistribution } from '../constructs/SecretManagerDistribution'
-import { DeployConfig, NextRedirects, NextI18nConfig, NextRewrites } from '../../types'
+import { DeployConfig } from '../../types'
 import * as iam from 'aws-cdk-lib/aws-iam'
 
 export interface NextCloudfrontStackProps extends StackProps {
@@ -18,13 +18,9 @@ export interface NextCloudfrontStackProps extends StackProps {
   buildOutputPath: string
   deployConfig: DeployConfig
   imageTTL?: number
-  redirectsConfig?: NextRedirects
-  nextI18nConfig?: NextI18nConfig
-  cachedRoutesMatchers: string[]
-  rewritesConfig: NextRewrites
-  isTrailingSlashEnabled: boolean
   sqsQueueUrl: string
   sqsQueueArn: string
+  appName: string
 }
 
 export class NextCloudfrontStack extends Stack {
@@ -43,32 +39,22 @@ export class NextCloudfrontStack extends Stack {
       region,
       deployConfig,
       imageTTL,
-      redirectsConfig,
-      cachedRoutesMatchers,
-      nextI18nConfig,
-      rewritesConfig,
-      isTrailingSlashEnabled,
       sqsQueueUrl,
-      sqsQueueArn
+      sqsQueueArn,
+      appName
     } = props
+
+    const secretName = `${appName}-x-api-key`
 
     this.originRequestLambdaEdge = new OriginRequestLambdaEdge(this, `${id}-OriginRequestLambdaEdge`, {
       nodejs,
       bucketName: staticBucketName,
-      renderServerDomain,
-      buildOutputPath,
-      cacheConfig: deployConfig.cache,
-      bucketRegion: region,
-      cachedRoutesMatchers
+      buildOutputPath
     })
 
     this.viewerRequestLambdaEdge = new ViewerRequestLambdaEdge(this, `${id}-ViewerRequestLambdaEdge`, {
       buildOutputPath,
-      nodejs,
-      redirectsConfig,
-      rewritesConfig,
-      nextI18nConfig,
-      isTrailingSlashEnabled
+      nodejs
     })
 
     this.viewerResponseLambdaEdge = new ViewerResponseLambdaEdge(this, `${id}-ViewerResponseLambdaEdge`, {
@@ -80,7 +66,8 @@ export class NextCloudfrontStack extends Stack {
       nodejs,
       buildOutputPath,
       sqsRegion: region,
-      sqsQueueUrl
+      sqsQueueUrl,
+      secretName
     })
 
     const staticBucket = s3.Bucket.fromBucketAttributes(this, `${id}-StaticAssetsBucket`, {
@@ -88,7 +75,9 @@ export class NextCloudfrontStack extends Stack {
       region
     })
 
-    const secretManager = new SecretManagerDistribution(this, `${id}-SecretManagerDistribution`)
+    const secretManager = new SecretManagerDistribution(this, `${id}-SecretManagerDistribution`, {
+      secretName
+    })
 
     secretManager.xApiKey.grantRead(this.revalidateLambda.lambda)
 

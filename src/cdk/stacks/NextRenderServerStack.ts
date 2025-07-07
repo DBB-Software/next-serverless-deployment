@@ -60,7 +60,7 @@ export class NextRenderServerStack extends cdk.Stack {
       isProduction
     })
 
-    this.renderServer = new RenderServerDistribution(this, `${id}-RenderServer`, {
+    this.renderServer = new RenderServerDistribution(this, `${id}-render`, {
       stage,
       nodejs,
       isProduction,
@@ -74,7 +74,7 @@ export class NextRenderServerStack extends cdk.Stack {
       healthCheckPath
     })
 
-    this.renderWorker = new RenderWorkerDistribution(this, `${id}-renderWorker`, {
+    this.renderWorker = new RenderWorkerDistribution(this, `${id}-worker`, {
       stage,
       nodejs,
       isProduction,

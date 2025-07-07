@@ -12,6 +12,7 @@ interface RevalidateLambdaProps extends cdk.StackProps {
   nodejs?: string
   sqsRegion: string
   sqsQueueUrl: string
+  secretName: string
 }
 
 const NodeJSEnvironmentMapping: Record<string, lambda.Runtime> = {
@@ -24,7 +25,7 @@ export class RevalidateLambda extends Construct {
   public readonly lambdaHttpUrl: lambda.FunctionUrl
 
   constructor(scope: Construct, id: string, props: RevalidateLambdaProps) {
-    const { nodejs, buildOutputPath, sqsRegion, sqsQueueUrl } = props
+    const { nodejs, buildOutputPath, sqsRegion, sqsQueueUrl, secretName } = props
     super(scope, id)
 
     const nodeJSEnvironment = NodeJSEnvironmentMapping[nodejs ?? ''] ?? NodeJSEnvironmentMapping['20']
@@ -45,7 +46,7 @@ export class RevalidateLambda extends Construct {
       logGroup,
       environment: {
         SQS_AWS_REGION: sqsRegion,
-        SECRET_ID: 'x-api-key',
+        SECRET_ID: secretName,
         SQS_QUEUE_URL: sqsQueueUrl
       }
     })
